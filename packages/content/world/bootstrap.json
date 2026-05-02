@@ -1,0 +1,194 @@
+{
+  "player_spawn": {
+    "location_id": "town_square",
+    "x": 3,
+    "y": 5,
+    "facing": "N"
+  },
+  "locations": [
+    {
+      "id": "town_square",
+      "name": "Town Square",
+      "description": "A wind-cut square of lanterns, shutters, and anxious travelers.",
+      "ascii_map": [
+        "#########",
+        "#.......#",
+        "#.......#",
+        "#.......#",
+        "#...I...#",
+        "#.......#",
+        "#...>...#",
+        "#.......#",
+        "#########"
+      ],
+      "exits": [
+        {
+          "x": 4,
+          "y": 6,
+          "target_location_id": "dungeon_approach",
+          "target_x": 4,
+          "target_y": 6,
+          "target_facing": "N",
+          "message": "You cross the ruined gate and feel the air grow colder."
+        }
+      ]
+    },
+    {
+      "id": "dungeon_approach",
+      "name": "Dungeon Approach",
+      "description": "Broken steps descend through old stone and damp moss.",
+      "ascii_map": [
+        "#########",
+        "#...<...#",
+        "#.......#",
+        "#.#####.#",
+        "#.......#",
+        "#.......#",
+        "#...>...#",
+        "#.......#",
+        "#########"
+      ],
+      "exits": [
+        {
+          "x": 4,
+          "y": 1,
+          "target_location_id": "town_square",
+          "target_x": 4,
+          "target_y": 5,
+          "target_facing": "S",
+          "message": "The town lights return, warmer than you remembered."
+        },
+        {
+          "x": 4,
+          "y": 6,
+          "transition": "generated_dungeon",
+          "biome_id": "ancient_halls",
+          "floor_number": 1,
+          "target_facing": "N",
+          "message": "You step below the threshold and the halls rearrange themselves around you."
+        }
+      ]
+    }
+  ],
+  "dungeon_biomes": [
+    {
+      "id": "ancient_halls",
+      "name": "Ancient Halls",
+      "description": "A narrow proving floor of cracked flags and listening dark.",
+      "procgen_version": "v1",
+      "floor_width": 19,
+      "floor_height": 19,
+      "max_rooms": 6,
+      "room_min_size": 3,
+      "room_max_size": 5,
+      "return_message": "You climb back toward the approach, carrying the echo of the halls with you."
+    }
+  ],
+  "starting_inventory": [
+    {
+      "item_id": "shortsword",
+      "quantity": 1,
+      "equipped": true
+    },
+    {
+      "item_id": "health_potion",
+      "quantity": 2,
+      "equipped": false
+    }
+  ],
+  "items": [
+    {
+      "id": "shortsword",
+      "name": "Shortsword",
+      "item_type": "weapon",
+      "damage": 4,
+      "healing": 0,
+      "stackable": false,
+      "value": 12,
+      "description": "A steady iron blade made for close work."
+    },
+    {
+      "id": "health_potion",
+      "name": "Health Potion",
+      "item_type": "consumable",
+      "damage": 0,
+      "healing": 6,
+      "stackable": true,
+      "value": 8,
+      "description": "A harsh red tonic that closes wounds fast enough to matter."
+    }
+  ],
+  "enemies": [
+    {
+      "id": "bone_warden",
+      "name": "Bone Warden",
+      "max_hp": 6,
+      "damage": 2,
+      "defence": 0,
+      "gold_drop": [3, 5],
+      "description": "A rattling guard that still remembers its post.",
+      "loot_table": [
+        {
+          "item_id": "health_potion",
+          "chance": 0.35,
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "tomb_sentinel",
+      "name": "Tomb Sentinel",
+      "max_hp": 8,
+      "damage": 3,
+      "defence": 1,
+      "gold_drop": [4, 6],
+      "description": "A heavier guardian of the first descent.",
+      "loot_table": [
+        {
+          "item_id": "health_potion",
+          "chance": 0.25,
+          "quantity": 1
+        }
+      ]
+    }
+  ],
+  "encounters": [
+    {
+      "id": "ancient_halls_floor_1",
+      "biome_id": "ancient_halls",
+      "floor_number": 1,
+      "enemy_ids": ["bone_warden"],
+      "message": "A Bone Warden tears itself from the rubble and lurches into your path."
+    }
+  ],
+  "npcs": [
+    {
+      "id": "marta-innkeeper",
+      "definition_id": "innkeeper",
+      "display_name": "Marta",
+      "role": "Innkeeper",
+      "location_id": "town_square",
+      "x": 4,
+      "y": 4,
+      "system_prompt": "You are Marta, the innkeeper who keeps travelers alive by telling them the truth before they descend.",
+      "greeting": "Rooms are cold, stew is thin, and the halls below are worse. Ask what matters.",
+      "town_hint": "Sukupol survives because everyone here remembers how many do not come back from below.",
+      "dungeon_hint": "The first descent lies straight beyond the gate. Do not rush corners, and do not trust silence.",
+      "supply_hint": "I can point you toward the scout by the gate. Marta keeps rumors, not rations."
+    },
+    {
+      "id": "petra-scout",
+      "definition_id": "scout",
+      "display_name": "Petra",
+      "role": "Scout",
+      "location_id": "dungeon_approach",
+      "x": 4,
+      "y": 5,
+      "system_prompt": "You are Petra, a watchful scout who maps the first descent and warns new delvers away from reckless choices.",
+      "greeting": "Keep your shoulders square and your ears open. The first halls test impatience more than courage.",
+      "town_hint": "The town only looks calm from a distance. Every quiet door belongs to someone waiting on a delver.",
+      "dungeon_hint": "Watch the choke points and keep track of your exit. New delvers die when they mistake progress for safety.",
+      "supply_hint": "Bring light, something to bind a wound, and enough nerve to turn back when the halls demand it."
+    }
+  ]
+}
