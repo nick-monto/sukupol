@@ -1,6 +1,6 @@
 # MVP architecture
 
-The current implementation uses a server-authoritative simulation model even though the project is single-player. The browser sends intents, the backend resolves movement and transitions, and the browser renders the snapshot returned by the service.
+The current implementation uses a server-authoritative simulation model even though the project is single-player. The browser sends intents, the backend resolves movement, transitions, and encounter checks, and the browser renders the snapshot returned by the service.
 
 ## Why this shape
 
@@ -10,7 +10,7 @@ The current implementation uses a server-authoritative simulation model even tho
 
 ## Prototype boundaries
 
-- The backend owns map data, first-person viewport generation, NPC proximity checks, and SQLite persistence.
+- The backend owns map data, traversal snapshot generation, encounter checks, NPC proximity checks, and SQLite persistence.
 - The frontend owns keyboard input, UI state, and visual presentation.
 - Shared world content lives in version-controlled JSON and seeds the database on startup.
 

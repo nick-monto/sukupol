@@ -4,9 +4,9 @@ export function createAppMarkup(title: string): string {
       <section class="hero" id="hero-panel">
         <div class="hero-top">
           <div class="hero-copy">
-            <p class="eyebrow">Expedition Console / server-authoritative prototype</p>
+            <p class="eyebrow">Sukupol / expedition console</p>
             <h1>${title}</h1>
-            <p class="hero-lede">A ceremonial terminal for town walks, dungeon descents, and uncertain conversations.</p>
+            <p class="hero-lede">Map-led traversal for movement, creature pressure, contact, and extraction.</p>
           </div>
           <div class="hero-actions">
             <button id="start-run">Begin expedition</button>
@@ -16,29 +16,80 @@ export function createAppMarkup(title: string): string {
 
         <div class="hero-band">
           <p class="signal" id="expedition-signal">No active expedition. Establish a run to receive telemetry.</p>
-          <div class="legend">
-            <span><span class="hotkey">W</span> advance</span>
-            <span><span class="hotkey">S</span> withdraw</span>
-            <span><span class="hotkey">A</span> pivot left</span>
-            <span><span class="hotkey">D</span> pivot right</span>
-          </div>
+          <div class="hero-summary" id="hero-summary"></div>
         </div>
-
-        <div class="hero-summary" id="hero-summary"></div>
       </section>
 
-      <section class="grid grid-primary">
+      <section class="stage-shell">
         <div class="panel viewport" id="viewport-panel">
           <div class="panel-header panel-header-inline">
             <div>
-              <p class="eyebrow">World View</p>
+              <p class="eyebrow">Traversal Map</p>
               <h2 id="location-name">No run started</h2>
             </div>
             <p class="location-meta" id="location-meta">Awaiting expedition telemetry.</p>
           </div>
-          <p id="location-description">Bring up the backend and start a run to render the first-person view.</p>
-          <div class="display-frame">
-            <pre id="viewport">Stand up the backend and begin a run.</pre>
+          <p id="location-description">Begin a run to render the live route, nearby contacts, and encounter ground.</p>
+          <div class="display-frame viewport-frame">
+            <div class="viewport-stage">
+              <div id="viewport-pixi-stage" class="viewport-pixi-stage" hidden aria-label="Traversal map"></div>
+              <pre id="viewport" class="viewport-fallback">Stand up the backend and begin a run.</pre>
+            </div>
+          </div>
+          <section class="viewport-chat context-drawer" id="context-drawer" data-mode="idle">
+            <button
+              class="viewport-chat-resize-handle"
+              id="viewport-chat-resize-handle"
+              type="button"
+              aria-label="Resize dialogue panel"
+              title="Drag to resize dialogue panel"
+            >
+              <span class="viewport-chat-resize-grip" aria-hidden="true"></span>
+            </button>
+            <div class="viewport-chat-head">
+              <div class="viewport-chat-intro">
+                <div>
+                  <p class="eyebrow" id="dispatch-kicker">Dispatch</p>
+                  <h3 id="dispatch-title">Field Orders</h3>
+                </div>
+                <p class="small panel-note" id="dispatch-note">Movement, contact, and combat orders converge here.</p>
+              </div>
+              <div class="viewport-chat-status log" id="log-panel" data-mode="idle">
+                <span class="chat-channel-pill" id="log-title">Dialogue</span>
+                <p class="small panel-note" id="log-help">Choose a nearby contact to open the channel.</p>
+              </div>
+            </div>
+            <div class="chat-transcript" id="dialogue-log" role="log" aria-live="polite"></div>
+            <div class="action-panel viewport-chat-compose" id="action-panel" data-mode="idle">
+              <div class="dialogue-form" id="interaction-panel">
+                <label for="player-message">Message</label>
+                <div class="chat-composer-row">
+                  <textarea id="player-message" rows="3" placeholder="Ask for rumors, routes, supplies, or warnings."></textarea>
+                  <div class="chat-composer-actions">
+                    <button id="send-message">Send</button>
+                    <button id="leave-conversation" type="button">Leave</button>
+                  </div>
+                </div>
+                <div class="combat-actions" id="combat-actions">
+                  <button data-combat-action="attack">Attack</button>
+                  <button data-combat-action="defend">Defend</button>
+                  <button data-combat-action="use_item:health_potion">Use potion</button>
+                  <button data-combat-action="flee">Flee</button>
+                </div>
+              </div>
+            </div>
+          </section>
+          <div class="viewport-support">
+            <div class="panel-subsection">
+              <div class="panel-header panel-header-compact">
+                <div>
+                  <p class="eyebrow">Stores</p>
+                  <h3>Loadout</h3>
+                </div>
+              </div>
+              <div class="inventory-list" id="inventory-list"></div>
+            </div>
+            <div class="npc-list" id="npc-list"></div>
           </div>
           <div class="hud">
             <div class="message-strip" id="message-strip">
@@ -46,69 +97,10 @@ export function createAppMarkup(title: string): string {
               <p class="message" id="message-log">Awaiting input.</p>
             </div>
             <div class="controls">
-              <button data-action="forward">Advance</button>
-              <button data-action="backward">Withdraw</button>
-              <button data-action="turn_left">Pivot left</button>
-              <button data-action="turn_right">Pivot right</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel map" id="map-panel">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Cartography</p>
-              <h2>Survey Slate</h2>
-            </div>
-            <p class="small panel-note">Persistent map telemetry for inspection during the prototype.</p>
-          </div>
-          <div class="display-frame compact-frame">
-            <pre id="minimap">No map yet.</pre>
-          </div>
-          <div class="panel-subsection">
-            <div class="panel-header panel-header-compact">
-              <div>
-                <p class="eyebrow">Stores</p>
-                <h3>Loadout</h3>
-              </div>
-            </div>
-            <div class="inventory-list" id="inventory-list"></div>
-          </div>
-          <div class="npc-list" id="npc-list"></div>
-        </div>
-      </section>
-
-      <section class="grid grid-secondary">
-        <div class="panel log" id="log-panel">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Comms</p>
-              <h2 id="log-title">Dialogue</h2>
-            </div>
-            <p class="small panel-note" id="log-help">Nearby NPCs can answer through the current fallback service. This panel will later stream local-model output via Agent Framework.</p>
-          </div>
-          <div class="display-frame compact-frame">
-            <pre id="dialogue-log">No dialogue yet.</pre>
-          </div>
-        </div>
-
-        <div class="panel action-panel" id="action-panel" data-mode="idle">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow" id="dispatch-kicker">Dispatch</p>
-              <h2 id="dispatch-title">Field Orders</h2>
-            </div>
-            <p class="small panel-note" id="dispatch-note">Compose a message when stationed near an NPC. Combat orders replace dialogue during encounters.</p>
-          </div>
-          <div class="dialogue-form" id="interaction-panel">
-            <label for="player-message">Message</label>
-            <textarea id="player-message" rows="6" placeholder="Ask about the dungeon, the town, or supplies."></textarea>
-            <button id="send-message">Transmit to selected contact</button>
-            <div class="combat-actions" id="combat-actions">
-              <button data-combat-action="attack">Attack</button>
-              <button data-combat-action="defend">Defend</button>
-              <button data-combat-action="use_item:health_potion">Use potion</button>
-              <button data-combat-action="flee">Flee</button>
+              <button data-action="move_north"><span class="hotkey">W</span> Move north</button>
+              <button data-action="move_west"><span class="hotkey">A</span> Move west</button>
+              <button data-action="move_south"><span class="hotkey">S</span> Move south</button>
+              <button data-action="move_east"><span class="hotkey">D</span> Move east</button>
             </div>
           </div>
         </div>
@@ -120,10 +112,19 @@ export function createAppMarkup(title: string): string {
             <p class="eyebrow">Archive</p>
             <h2 id="outcome-title">Run Chronicle</h2>
           </div>
-          <p class="small panel-note" id="outcome-note">End-of-run outcomes and long-view progression notes.</p>
+          <p class="small panel-note" id="outcome-note">Resolved runs and long-view progression.</p>
         </div>
         <div class="display-frame compact-frame">
           <pre id="outcome-log">No completed run yet.</pre>
+        </div>
+        <div class="panel-subsection">
+          <div class="panel-header panel-header-compact">
+            <div>
+              <p class="eyebrow">Journal</p>
+              <h3>NPC visits</h3>
+            </div>
+          </div>
+          <div class="journal-list" id="journal-list"></div>
         </div>
       </section>
     </div>
@@ -142,6 +143,8 @@ export type UiElements = {
   shell: HTMLDivElement;
   heroPanel: HTMLElement;
   viewportPanel: HTMLElement;
+  contextDrawer: HTMLElement;
+  chatResizeHandle: HTMLButtonElement;
   logPanel: HTMLElement;
   actionPanel: HTMLElement;
   outcomePanel: HTMLElement;
@@ -150,9 +153,9 @@ export type UiElements = {
   expeditionSignal: HTMLParagraphElement;
   heroSummary: HTMLDivElement;
   viewport: HTMLPreElement;
-  minimap: HTMLPreElement;
-  dialogueLog: HTMLPreElement;
-  logTitle: HTMLHeadingElement;
+  viewportPixiStage: HTMLDivElement;
+  dialogueLog: HTMLDivElement;
+  logTitle: HTMLElement;
   logHelp: HTMLParagraphElement;
   locationName: HTMLHeadingElement;
   locationMeta: HTMLParagraphElement;
@@ -163,6 +166,7 @@ export type UiElements = {
   npcList: HTMLDivElement;
   inventoryList: HTMLDivElement;
   sendMessageButton: HTMLButtonElement;
+  leaveConversationButton: HTMLButtonElement;
   playerMessage: HTMLTextAreaElement;
   combatActions: HTMLDivElement;
   dispatchKicker: HTMLParagraphElement;
@@ -171,6 +175,7 @@ export type UiElements = {
   outcomeTitle: HTMLHeadingElement;
   outcomeNote: HTMLParagraphElement;
   outcomeLog: HTMLPreElement;
+  journalList: HTMLDivElement;
 };
 
 export function getUiElements(): UiElements {
@@ -178,6 +183,8 @@ export function getUiElements(): UiElements {
     shell: element<HTMLDivElement>("#shell"),
     heroPanel: element<HTMLElement>("#hero-panel"),
     viewportPanel: element<HTMLElement>("#viewport-panel"),
+    contextDrawer: element<HTMLElement>("#context-drawer"),
+    chatResizeHandle: element<HTMLButtonElement>("#viewport-chat-resize-handle"),
     logPanel: element<HTMLElement>("#log-panel"),
     actionPanel: element<HTMLElement>("#action-panel"),
     outcomePanel: element<HTMLElement>("#outcome-panel"),
@@ -186,9 +193,9 @@ export function getUiElements(): UiElements {
     expeditionSignal: element<HTMLParagraphElement>("#expedition-signal"),
     heroSummary: element<HTMLDivElement>("#hero-summary"),
     viewport: element<HTMLPreElement>("#viewport"),
-    minimap: element<HTMLPreElement>("#minimap"),
-    dialogueLog: element<HTMLPreElement>("#dialogue-log"),
-    logTitle: element<HTMLHeadingElement>("#log-title"),
+    viewportPixiStage: element<HTMLDivElement>("#viewport-pixi-stage"),
+    dialogueLog: element<HTMLDivElement>("#dialogue-log"),
+    logTitle: element<HTMLElement>("#log-title"),
     logHelp: element<HTMLParagraphElement>("#log-help"),
     locationName: element<HTMLHeadingElement>("#location-name"),
     locationMeta: element<HTMLParagraphElement>("#location-meta"),
@@ -199,6 +206,7 @@ export function getUiElements(): UiElements {
     npcList: element<HTMLDivElement>("#npc-list"),
     inventoryList: element<HTMLDivElement>("#inventory-list"),
     sendMessageButton: element<HTMLButtonElement>("#send-message"),
+    leaveConversationButton: element<HTMLButtonElement>("#leave-conversation"),
     playerMessage: element<HTMLTextAreaElement>("#player-message"),
     combatActions: element<HTMLDivElement>("#combat-actions"),
     dispatchKicker: element<HTMLParagraphElement>("#dispatch-kicker"),
@@ -207,6 +215,7 @@ export function getUiElements(): UiElements {
     outcomeTitle: element<HTMLHeadingElement>("#outcome-title"),
     outcomeNote: element<HTMLParagraphElement>("#outcome-note"),
     outcomeLog: element<HTMLPreElement>("#outcome-log"),
+    journalList: element<HTMLDivElement>("#journal-list"),
   };
 }
 

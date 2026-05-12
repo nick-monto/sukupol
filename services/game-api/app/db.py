@@ -67,6 +67,28 @@ def seed_npc_content(connection: sqlite3.Connection, world: WorldContent) -> Non
         )
 
 
+def seed_npc_knowledge(connection: sqlite3.Connection, world: WorldContent) -> None:
+    for npc in world.npcs.values():
+        now = utc_now()
+        knowledge_entries = [
+            ("persona", npc["system_prompt"]),
+            ("town", npc["town_hint"]),
+            ("dungeon", npc["dungeon_hint"]),
+            ("supply", npc["supply_hint"]),
+        ]
+        for category, content in knowledge_entries:
+            connection.execute(
+                """
+                INSERT INTO npc_shared_knowledge (id, npc_instance_id, category, content, source, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(npc_instance_id, category, content) DO UPDATE SET
+                  source = excluded.source,
+                  updated_at = excluded.updated_at
+                """,
+                (str(uuid4()), npc["id"], category, content, "seed", now, now),
+            )
+
+
 def seed_gameplay_content(connection: sqlite3.Connection, world: WorldContent) -> None:
     for item in world.items.values():
         connection.execute(
@@ -162,6 +184,8 @@ def seed_gameplay_content(connection: sqlite3.Connection, world: WorldContent) -
                 0,
             ),
         )
+
+    seed_npc_knowledge(connection, world)
 
 
 def ensure_player_profile(player_id: str, player_name: str, db_path: Path | None = None) -> None:
@@ -429,6 +453,204 @@ def load_conversation_summary(player_id: str, npc_id: str, db_path: Path | None 
         ).fetchone()
 
     return row["summary"] if row else ""
+
+
+def load_npc_player_memory(player_id: str, npc_id: str, db_path: Path | None = None) -> dict:
+    with connect(db_path) as connection:
+        row = connection.execute(
+            """
+            SELECT summary, last_player_message, last_npc_reply, updated_at
+            FROM npc_player_memories
+            WHERE player_id = ? AND npc_instance_id = ?
+            """,
+            (player_id, npc_id),
+        ).fetchone()
+
+    if row is None:
+        legacy_summary = load_conversation_summary(player_id, npc_id, db_path=db_path)
+        return {
+            "summary": legacy_summary,
+            "last_player_message": "",
+            "last_npc_reply": "",
+            "updated_at": "",
+        }
+
+    return dict(row)
+
+
+def create_npc_journal_entry(
+    player_id: str,
+    npc_id: str,
+    run_id: str,
+    summary: str,
+    visit_started_at: str,
+    visit_ended_at: str,
+    turn_count: int,
+    db_path: Path | None = None,
+) -> dict:
+    entry_id = str(uuid4())
+    created_at = utc_now()
+    with connect(db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO npc_journal_entries (
+              id,
+              player_id,
+              npc_instance_id,
+              run_id,
+              turn_count,
+              visit_started_at,
+              visit_ended_at,
+              summary,
+              created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry_id,
+                player_id,
+                npc_id,
+                run_id,
+                max(turn_count, 0),
+                visit_started_at,
+                visit_ended_at,
+                summary.strip(),
+                created_at,
+            ),
+        )
+        row = connection.execute(
+            """
+            SELECT journal.id, journal.npc_instance_id AS npc_id, defs.display_name AS npc_name,
+                   journal.run_id, journal.turn_count, journal.visit_started_at,
+                   journal.visit_ended_at, journal.summary, journal.created_at
+            FROM npc_journal_entries AS journal
+            JOIN npc_instances AS instances ON instances.id = journal.npc_instance_id
+            JOIN npc_definitions AS defs ON defs.id = instances.definition_id
+            WHERE journal.id = ?
+            """,
+            (entry_id,),
+        ).fetchone()
+        connection.commit()
+
+    return dict(row) if row else {
+        "id": entry_id,
+        "npc_id": npc_id,
+        "npc_name": npc_id,
+        "run_id": run_id,
+        "turn_count": max(turn_count, 0),
+        "visit_started_at": visit_started_at,
+        "visit_ended_at": visit_ended_at,
+        "summary": summary.strip(),
+        "created_at": created_at,
+    }
+
+
+def list_player_npc_journal(player_id: str, db_path: Path | None = None) -> list[dict]:
+    with connect(db_path) as connection:
+        rows = connection.execute(
+            """
+            SELECT journal.id, journal.npc_instance_id AS npc_id, defs.display_name AS npc_name,
+                   journal.run_id, journal.turn_count, journal.visit_started_at,
+                   journal.visit_ended_at, journal.summary, journal.created_at
+            FROM npc_journal_entries AS journal
+            JOIN npc_instances AS instances ON instances.id = journal.npc_instance_id
+            JOIN npc_definitions AS defs ON defs.id = instances.definition_id
+            WHERE journal.player_id = ?
+            ORDER BY journal.visit_ended_at DESC, journal.created_at DESC
+            """,
+            (player_id,),
+        ).fetchall()
+
+    groups: dict[str, dict] = {}
+    ordered_groups: list[dict] = []
+    for row in rows:
+        payload = dict(row)
+        group = groups.get(payload["npc_id"])
+        if group is None:
+            group = {
+                "npc_id": payload["npc_id"],
+                "npc_name": payload["npc_name"],
+                "entries": [],
+            }
+            groups[payload["npc_id"]] = group
+            ordered_groups.append(group)
+
+        group["entries"].append(
+            {
+                "id": payload["id"],
+                "run_id": payload["run_id"],
+                "turn_count": payload["turn_count"],
+                "visit_started_at": payload["visit_started_at"],
+                "visit_ended_at": payload["visit_ended_at"],
+                "summary": payload["summary"],
+                "created_at": payload["created_at"],
+            }
+        )
+
+    return ordered_groups
+
+
+def upsert_npc_player_memory(
+    player_id: str,
+    npc_id: str,
+    summary: str,
+    last_player_message: str,
+    last_npc_reply: str,
+    db_path: Path | None = None,
+) -> None:
+    with connect(db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO npc_player_memories (player_id, npc_instance_id, summary, last_player_message, last_npc_reply, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(player_id, npc_instance_id) DO UPDATE SET
+              summary = excluded.summary,
+              last_player_message = excluded.last_player_message,
+              last_npc_reply = excluded.last_npc_reply,
+              updated_at = excluded.updated_at
+            """,
+            (player_id, npc_id, summary, last_player_message, last_npc_reply, utc_now()),
+        )
+        connection.commit()
+
+
+def list_npc_shared_knowledge(npc_id: str, limit: int = 8, db_path: Path | None = None) -> list[dict]:
+    with connect(db_path) as connection:
+        rows = connection.execute(
+            """
+            SELECT category, content, source, updated_at
+            FROM npc_shared_knowledge
+            WHERE npc_instance_id = ?
+            ORDER BY updated_at DESC
+            LIMIT ?
+            """,
+            (npc_id, limit),
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
+
+def upsert_npc_shared_knowledge(
+    npc_id: str,
+    category: str,
+    content: str,
+    source: str,
+    db_path: Path | None = None,
+) -> None:
+    if not content.strip():
+        return
+
+    with connect(db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO npc_shared_knowledge (id, npc_instance_id, category, content, source, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(npc_instance_id, category, content) DO UPDATE SET
+              source = excluded.source,
+              updated_at = excluded.updated_at
+            """,
+            (str(uuid4()), npc_id, category, content.strip(), source, utc_now(), utc_now()),
+        )
+        connection.commit()
 
 
 def save_run_outcome(

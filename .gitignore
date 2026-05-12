@@ -226,3 +226,5 @@ services/game-api/data/*.db
 services/game-api/data/*.db-journal
 services/game-api/data/*.db-shm
 services/game-api/data/*.db-wal
+
+docs/

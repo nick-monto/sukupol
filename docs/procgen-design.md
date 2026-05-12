@@ -7,6 +7,7 @@ The first procedural dungeon implementation keeps the location contract stable. 
 - One biome: Ancient Halls.
 - Deterministic floor seed derived from run seed, floor number, biome id, and retry attempt.
 - Room-and-corridor generation only.
+- Cosmetic floor dressing now sprinkles walkable rubble and worn-stone glyphs across generated floors after carving, while preserving entry and exit readability.
 - Validation checks entry reachability, exit reachability, and minimum walkable area.
 - Returning to the approach uses a normal exit generated into the floor layout.
 

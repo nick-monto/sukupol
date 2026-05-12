@@ -10,26 +10,80 @@
       "id": "town_square",
       "name": "Town Square",
       "description": "A wind-cut square of lanterns, shutters, and anxious travelers.",
+      "location_type": "town",
+      "encounter_enabled": false,
       "ascii_map": [
         "#########",
-        "#.......#",
-        "#.......#",
-        "#.......#",
-        "#...I...#",
-        "#.......#",
+        "#,.....,#",
+        "#.#,;.#.#",
+        "#,..;..,#",
+        "#...;...#",
+        "#,.....,#",
         "#...>...#",
-        "#.......#",
+        "#.#,;.#.#",
         "#########"
       ],
       "exits": [
         {
           "x": 4,
           "y": 6,
+          "target_location_id": "outer_fields",
+          "target_x": 1,
+          "target_y": 5,
+          "target_facing": "E",
+          "message": "You pass the gate and the road opens into the outer fields."
+        }
+      ]
+    },
+    {
+      "id": "outer_fields",
+      "name": "Outer Fields",
+      "description": "A battered road crossing wet grass, collapsed walls, and the old approaches beyond Sukupol.",
+      "location_type": "overworld",
+      "encounter_enabled": true,
+      "encounter_rate": 18,
+      "biome_id": "ashen_fields",
+      "encounter_floor": 0,
+      "ascii_map": [
+        "###############",
+        "#..,.....;....#",
+        "#.....,....,..#",
+        "#...###.###...#",
+        "#.............#",
+        "#<..#..>..#..>#",
+        "#.............#",
+        "#...###.###...#",
+        "#..;....,.....#",
+        "#....,.....;..#",
+        "###############"
+      ],
+      "exits": [
+        {
+          "x": 1,
+          "y": 5,
+          "target_location_id": "town_square",
+          "target_x": 4,
+          "target_y": 5,
+          "target_facing": "N",
+          "message": "The town walls close around you and the watchfires steady your nerves."
+        },
+        {
+          "x": 7,
+          "y": 5,
           "target_location_id": "dungeon_approach",
           "target_x": 4,
           "target_y": 6,
           "target_facing": "N",
-          "message": "You cross the ruined gate and feel the air grow colder."
+          "message": "You leave the road and descend toward the old dungeon approach."
+        },
+        {
+          "x": 13,
+          "y": 5,
+          "target_location_id": "whispering_cave",
+          "target_x": 1,
+          "target_y": 4,
+          "target_facing": "E",
+          "message": "A split in the earth opens into a whispering cave mouth."
         }
       ]
     },
@@ -37,26 +91,31 @@
       "id": "dungeon_approach",
       "name": "Dungeon Approach",
       "description": "Broken steps descend through old stone and damp moss.",
+      "location_type": "wilderness",
+      "encounter_enabled": true,
+      "encounter_rate": 22,
+      "biome_id": "ashen_fields",
+      "encounter_floor": 0,
       "ascii_map": [
         "#########",
         "#...<...#",
-        "#.......#",
-        "#.#####.#",
-        "#.......#",
-        "#.......#",
+        "#,;###;,#",
+        "#.;#,#;.#",
+        "#,..;..,#",
+        "##,.;,.##",
         "#...>...#",
-        "#.......#",
+        "#,..;..,#",
         "#########"
       ],
       "exits": [
         {
           "x": 4,
           "y": 1,
-          "target_location_id": "town_square",
-          "target_x": 4,
+          "target_location_id": "outer_fields",
+          "target_x": 7,
           "target_y": 5,
           "target_facing": "S",
-          "message": "The town lights return, warmer than you remembered."
+          "message": "The old steps lift you back into the exposed road across the fields."
         },
         {
           "x": 4,
@@ -68,9 +127,67 @@
           "message": "You step below the threshold and the halls rearrange themselves around you."
         }
       ]
+    },
+    {
+      "id": "whispering_cave",
+      "name": "Whispering Cave",
+      "description": "A low stone chamber where dripping mineral teeth catch every footstep and throw it back at you.",
+      "location_type": "cave",
+      "encounter_enabled": true,
+      "encounter_rate": 26,
+      "biome_id": "whispering_caverns",
+      "encounter_floor": 0,
+      "ascii_map": [
+        "###########",
+        "#...;.....#",
+        "#.#####...#",
+        "#.#...#...#",
+        "#<#.,.#...#",
+        "#.#...#...#",
+        "#...###...#",
+        "#.....;...#",
+        "###########"
+      ],
+      "exits": [
+        {
+          "x": 1,
+          "y": 4,
+          "target_location_id": "outer_fields",
+          "target_x": 13,
+          "target_y": 5,
+          "target_facing": "W",
+          "message": "You squeeze back into the cold open air beyond the cave mouth."
+        }
+      ]
     }
   ],
   "dungeon_biomes": [
+    {
+      "id": "ashen_fields",
+      "name": "Ashen Fields",
+      "description": "Cold roadways, ruined walls, and the things that stalk them after dark.",
+      "procgen_version": "static",
+      "floor_width": 15,
+      "floor_height": 11,
+      "max_rooms": 0,
+      "room_min_size": 0,
+      "room_max_size": 0,
+      "encounter_rate": 18,
+      "return_message": "The road back to Sukupol looks narrower than it should."
+    },
+    {
+      "id": "whispering_caverns",
+      "name": "Whispering Caverns",
+      "description": "Tight wet chambers where sound moves ahead of whatever made it.",
+      "procgen_version": "static",
+      "floor_width": 11,
+      "floor_height": 9,
+      "max_rooms": 0,
+      "room_min_size": 0,
+      "room_max_size": 0,
+      "encounter_rate": 26,
+      "return_message": "The cave gives you back to the fields one careful step at a time."
+    },
     {
       "id": "ancient_halls",
       "name": "Ancient Halls",
@@ -81,6 +198,7 @@
       "max_rooms": 6,
       "room_min_size": 3,
       "room_max_size": 5,
+      "encounter_rate": 28,
       "return_message": "You climb back toward the approach, carrying the echo of the halls with you."
     }
   ],
@@ -122,6 +240,12 @@
     {
       "id": "bone_warden",
       "name": "Bone Warden",
+      "ascii_art": [
+        "  .--. ",
+        " (x##) ",
+        " /|=|\\",
+        "  d b  "
+      ],
       "max_hp": 6,
       "damage": 2,
       "defence": 0,
@@ -138,6 +262,12 @@
     {
       "id": "tomb_sentinel",
       "name": "Tomb Sentinel",
+      "ascii_art": [
+        "  /^\\  ",
+        " [o_o] ",
+        " /|_|\\",
+        "  / \\  "
+      ],
       "max_hp": 8,
       "damage": 3,
       "defence": 1,
@@ -150,15 +280,88 @@
           "quantity": 1
         }
       ]
+    },
+    {
+      "id": "crypt_hound",
+      "name": "Crypt Hound",
+      "ascii_art": [
+        "  /^-^\\ ",
+        " ( o o )",
+        " /| ^ |\\",
+        "  /   \\\\"
+      ],
+      "max_hp": 5,
+      "damage": 3,
+      "defence": 0,
+      "gold_drop": [2, 4],
+      "description": "A lean scavenger that learned to hunt where the dead are stacked.",
+      "loot_table": [
+        {
+          "item_id": "health_potion",
+          "chance": 0.2,
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "moss_lantern",
+      "name": "Moss Lantern",
+      "ascii_art": [
+        "  .--.  ",
+        " (o==o) ",
+        " /|..|\\",
+        "  /__\\  "
+      ],
+      "max_hp": 7,
+      "damage": 2,
+      "defence": 1,
+      "gold_drop": [3, 5],
+      "description": "A damp shrine-light with a frame of bone and bronze.",
+      "loot_table": [
+        {
+          "item_id": "health_potion",
+          "chance": 0.3,
+          "quantity": 1
+        }
+      ]
     }
   ],
   "encounters": [
     {
+      "id": "ashen_fields_travel",
+      "biome_id": "ashen_fields",
+      "floor_number": 0,
+      "enemy_ids": ["crypt_hound", "moss_lantern"],
+      "message": "{enemy_name} crosses the road and cuts off your route.",
+      "message_by_enemy": {
+        "crypt_hound": "A Crypt Hound breaks from the wet grass and circles in low.",
+        "moss_lantern": "A Moss Lantern drifts over the roadside stones and brightens with hostile intent."
+      }
+    },
+    {
+      "id": "whispering_caverns_depth_0",
+      "biome_id": "whispering_caverns",
+      "floor_number": 0,
+      "enemy_ids": ["crypt_hound", "moss_lantern", "tomb_sentinel"],
+      "message": "{enemy_name} stirs in the cave and surges toward you.",
+      "message_by_enemy": {
+        "crypt_hound": "A Crypt Hound slips between the cave pillars and lunges for your throat.",
+        "moss_lantern": "A Moss Lantern blooms awake in the dark and glides into your path.",
+        "tomb_sentinel": "A Tomb Sentinel drags itself upright from the cave floor and bars your retreat."
+      }
+    },
+    {
       "id": "ancient_halls_floor_1",
       "biome_id": "ancient_halls",
       "floor_number": 1,
-      "enemy_ids": ["bone_warden"],
-      "message": "A Bone Warden tears itself from the rubble and lurches into your path."
+      "enemy_ids": ["bone_warden", "crypt_hound", "moss_lantern", "tomb_sentinel"],
+      "message": "{enemy_name} emerges from the first descent and cuts across your path.",
+      "message_by_enemy": {
+        "bone_warden": "A Bone Warden tears itself from the rubble and lurches into your path.",
+        "crypt_hound": "A Crypt Hound slips from a side chamber and lowers itself to spring.",
+        "moss_lantern": "A Moss Lantern brightens in the dark and drifts toward you with a funeral hum.",
+        "tomb_sentinel": "A Tomb Sentinel stamps forward from the masonry and lowers its stone-cut blade."
+      }
     }
   ],
   "npcs": [
@@ -166,6 +369,12 @@
       "id": "marta-innkeeper",
       "definition_id": "innkeeper",
       "display_name": "Marta",
+      "ascii_art": [
+        "  .--.  ",
+        " (o__o) ",
+        " /|##|\\",
+        "  /  \\\\ "
+      ],
       "role": "Innkeeper",
       "location_id": "town_square",
       "x": 4,
@@ -177,9 +386,35 @@
       "supply_hint": "I can point you toward the scout by the gate. Marta keeps rumors, not rations."
     },
     {
+      "id": "ilya-lamplighter",
+      "definition_id": "lamplighter",
+      "display_name": "Ilya",
+      "ascii_art": [
+        "  .--.  ",
+        " ( -.-) ",
+        " /|\\/|\\",
+        "  /_ \\\\ "
+      ],
+      "role": "Lamplighter",
+      "location_id": "town_square",
+      "x": 3,
+      "y": 4,
+      "system_prompt": "You are Ilya, the town lamplighter who notices fear before other people admit to it.",
+      "greeting": "The lamps only hold if someone keeps pace with the dark. Ask, and I will tell you what I have seen.",
+      "town_hint": "Every bright window in Sukupol is borrowed courage. When the lamps sputter, people count the missing.",
+      "dungeon_hint": "The halls below eat light by habit. Bring more than one flame, and trust the second one first.",
+      "supply_hint": "Oil, bandage cloth, and dry tinder. Steel is useful, but most delvers fail long before the blade does."
+    },
+    {
       "id": "petra-scout",
       "definition_id": "scout",
       "display_name": "Petra",
+      "ascii_art": [
+        "  /^\\  ",
+        " (o..o) ",
+        " /|==|\\",
+        "  /  \\\\ "
+      ],
       "role": "Scout",
       "location_id": "dungeon_approach",
       "x": 4,
@@ -189,6 +424,26 @@
       "town_hint": "The town only looks calm from a distance. Every quiet door belongs to someone waiting on a delver.",
       "dungeon_hint": "Watch the choke points and keep track of your exit. New delvers die when they mistake progress for safety.",
       "supply_hint": "Bring light, something to bind a wound, and enough nerve to turn back when the halls demand it."
+    },
+    {
+      "id": "sava-herbalist",
+      "definition_id": "herbalist",
+      "display_name": "Sava",
+      "ascii_art": [
+        "  .~~.  ",
+        " (o_o ) ",
+        " /|..|\\",
+        "  /__\\  "
+      ],
+      "role": "Herbalist",
+      "location_id": "dungeon_approach",
+      "x": 5,
+      "y": 6,
+      "system_prompt": "You are Sava, an herbalist who studies what grows in damp stone and what poisons cling to the first descent.",
+      "greeting": "Moss tells the truth if you know how to read the stain. Ask what the stone has been feeding.",
+      "town_hint": "Sukupol smells of broth, smoke, and fear covered over with soap. That is how you know the place is still alive.",
+      "dungeon_hint": "If the walls turn wet and sweet, slow down. Growth down there means something failed to die cleanly.",
+      "supply_hint": "Carry a tonic for fever, a strip of clean cloth, and enough sense not to taste anything you find below."
     }
   ]
 }

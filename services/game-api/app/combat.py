@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .content import WorldContent
-from .game import RunState, resolve_location
+from .game import RunState, encounter_context_for_location, resolve_location
 from .inventory import add_item, get_equipped_weapon, use_item
 
 
@@ -15,46 +15,82 @@ def deterministic_roll(run_seed: int, *parts: Any, low: int, high: int) -> int:
     return low + (checksum % span)
 
 
-def maybe_start_encounter(world: WorldContent, state: RunState) -> None:
-    if state.in_combat or state.run_result is not None:
-        return
-    if not state.location_id.startswith("dungeon:"):
-        return
-    triggered = state.triggered_encounters or []
-    if state.location_id in triggered:
+def maybe_start_encounter(world: WorldContent, state: RunState, moved: bool = True) -> None:
+    if state.in_combat or state.run_result is not None or not moved:
         return
 
     location = resolve_location(world, state.location_id)
+    encounter_context = encounter_context_for_location(world, location)
+    if not encounter_context["enabled"]:
+        return
+
     encounter = next(
         (
             candidate
             for candidate in world.encounters
-            if candidate["biome_id"] == location.get("biome_id")
-            and int(candidate["floor_number"]) == int(location.get("floor_number", 1))
+            if candidate["biome_id"] == encounter_context["biome_id"]
+            and int(candidate["floor_number"]) == int(encounter_context["floor_number"])
         ),
         None,
     )
+    if encounter is None and int(encounter_context["floor_number"]) != 0:
+        encounter = next(
+            (
+                candidate
+                for candidate in world.encounters
+                if candidate["biome_id"] == encounter_context["biome_id"]
+                and int(candidate["floor_number"]) == 0
+            ),
+            None,
+        )
     if encounter is None:
-        triggered.append(state.location_id)
-        state.triggered_encounters = triggered
         return
 
-    enemy_id = encounter["enemy_ids"][0]
+    encounter_roll = deterministic_roll(
+        state.run_seed,
+        state.location_id,
+        state.x,
+        state.y,
+        state.steps_taken,
+        "encounter-rate",
+        low=1,
+        high=100,
+    )
+    if encounter_roll > int(encounter_context["encounter_rate"]):
+        return
+
+    enemy_ids = encounter["enemy_ids"]
+    enemy_index = deterministic_roll(
+        state.run_seed,
+        state.location_id,
+        state.x,
+        state.y,
+        state.steps_taken,
+        "encounter-enemy",
+        low=0,
+        high=len(enemy_ids) - 1,
+    )
+    enemy_id = enemy_ids[enemy_index]
     enemy = world.enemies[enemy_id]
+    encounter_message = encounter.get("message_by_enemy", {}).get(enemy_id)
+    if encounter_message is None:
+        encounter_message = encounter["message"].format(enemy_name=enemy["name"])
     state.in_combat = True
     state.combat_state = {
         "enemy_id": enemy_id,
         "enemy_name": enemy["name"],
+        "enemy_ascii_art": enemy.get("ascii_art", []),
         "enemy_hp": enemy["max_hp"],
         "enemy_max_hp": enemy["max_hp"],
         "enemy_damage": enemy["damage"],
         "enemy_defence": enemy.get("defence", 0),
         "round": 1,
-        "log": [encounter["message"]],
+        "log": [encounter_message],
     }
-    state.message = encounter["message"]
-    triggered.append(state.location_id)
-    state.triggered_encounters = triggered
+    state.message = encounter_message
+    triggered = state.triggered_encounters or []
+    triggered.append(f"{state.location_id}:{state.steps_taken}:{enemy_id}")
+    state.triggered_encounters = triggered[-24:]
 
 
 def resolve_turn(world: WorldContent, state: RunState, action: str) -> None:

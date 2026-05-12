@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import json
+import os
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from .content import WorldContent, load_world_content
@@ -39,12 +43,40 @@ class TalkRequest(BaseModel):
     message: str = Field(min_length=1, max_length=500)
 
 
+class RunScopedRequest(BaseModel):
+    run_id: str
+
+
 class CombatRequest(BaseModel):
     action: str
 
 
+ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
+
+
+def load_env_file(path: Path = ENV_PATH) -> None:
+    if not path.exists():
+        return
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+        os.environ[key] = value
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    load_env_file()
     world = load_world_content()
     initialize_database(world)
     app.state.world = world
@@ -156,6 +188,7 @@ def handle_transition(state: RunState, exit_node: dict) -> bool:
 
 
 def finalize_and_persist(state: RunState, result: str) -> None:
+    app.state.dialogue.finalize_all_active_visits(get_world(), state)
     outcome = finalize_run(state, result=result)
     save_run_outcome(
         run_id=state.id,
@@ -173,9 +206,19 @@ def finalize_and_persist(state: RunState, result: str) -> None:
     )
 
 
+def build_authoritative_snapshot(state: RunState) -> dict:
+    return build_snapshot(get_world(), state)
+
+
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, str | None]:
+    dialogue_status = app.state.dialogue.status()
+    return {
+        "status": "ok",
+        "dialogue_mode": dialogue_status["mode"],
+        "dialogue_provider_base_url": dialogue_status["provider_base_url"],
+        "dialogue_provider_model": dialogue_status["provider_model"],
+    }
 
 
 @app.get("/api/bootstrap")
@@ -209,7 +252,7 @@ def start_run(request: StartRunRequest) -> dict:
     ensure_player_profile(state.player_id, state.player_name)
     app.state.runs[state.id] = state
     save_run_snapshot(state_to_dict(state))
-    return build_snapshot(world, state)
+    return build_authoritative_snapshot(state)
 
 
 @app.post("/api/runs/{run_id}/actions")
@@ -218,10 +261,24 @@ def act(run_id: str, request: ActionRequest) -> dict:
     state = get_run_state(run_id)
     if state.run_result is not None:
         raise HTTPException(status_code=400, detail="Run is already complete")
+    previous_location_id = state.location_id
+    previous_x = state.x
+    previous_y = state.y
+    previous_steps = state.steps_taken
     perform_action(world, state, request.action, transition_handler=handle_transition)
-    maybe_start_encounter(world, state)
+    moved = (
+        state.steps_taken != previous_steps
+        or state.location_id != previous_location_id
+        or state.x != previous_x
+        or state.y != previous_y
+    )
+    maybe_start_encounter(world, state, moved=moved)
+    if state.in_combat:
+        app.state.dialogue.finalize_all_active_visits(world, state)
+    else:
+        app.state.dialogue.finalize_departed_visits(world, state)
     save_run_snapshot(state_to_dict(state))
-    return build_snapshot(world, state)
+    return build_authoritative_snapshot(state)
 
 
 @app.post("/api/runs/{run_id}/combat")
@@ -235,7 +292,7 @@ def combat(run_id: str, request: CombatRequest) -> dict:
     if state.run_result == "death":
         finalize_and_persist(state, "death")
     save_run_snapshot(state_to_dict(state))
-    return build_snapshot(world, state)
+    return build_authoritative_snapshot(state)
 
 
 @app.post("/api/runs/{run_id}/extract")
@@ -251,7 +308,7 @@ def extract(run_id: str) -> dict:
 
     finalize_and_persist(state, "extraction")
     save_run_snapshot(state_to_dict(state))
-    return build_snapshot(world, state)
+    return build_authoritative_snapshot(state)
 
 
 @app.post("/api/npcs/{npc_id}/talk")
@@ -268,7 +325,8 @@ def talk_to_npc(npc_id: str, request: TalkRequest) -> dict:
         raise HTTPException(status_code=400, detail="NPC is not nearby")
 
     reply = app.state.dialogue.talk(world, state, npc_id, request.message)
-    snapshot = build_snapshot(world, state)
+    save_run_snapshot(state_to_dict(state))
+    snapshot = build_authoritative_snapshot(state)
     snapshot["dialogue"] = {
         "npc_id": reply.npc_id,
         "npc_name": reply.npc_name,
@@ -276,3 +334,53 @@ def talk_to_npc(npc_id: str, request: TalkRequest) -> dict:
         "source": reply.source,
     }
     return snapshot
+
+
+@app.post("/api/npcs/{npc_id}/talk/stream")
+async def stream_talk_to_npc(npc_id: str, request: TalkRequest) -> StreamingResponse:
+    world = get_world()
+    if npc_id not in world.npcs:
+        raise HTTPException(status_code=404, detail="NPC not found")
+
+    state = get_run_state(request.run_id)
+    if state.in_combat:
+        raise HTTPException(status_code=400, detail="You cannot talk during combat")
+    nearby_ids = {npc["id"] for npc in build_snapshot(world, state)["nearby_npcs"]}
+    if npc_id not in nearby_ids:
+        raise HTTPException(status_code=400, detail="NPC is not nearby")
+
+    async def stream_events():
+        try:
+            async for event in app.state.dialogue.stream_talk(world, state, npc_id, request.message):
+                if event["type"] == "complete":
+                    reply = event["reply"]
+                    save_run_snapshot(state_to_dict(state))
+                    snapshot = build_authoritative_snapshot(state)
+                    snapshot["dialogue"] = {
+                        "npc_id": reply["npc_id"],
+                        "npc_name": reply["npc_name"],
+                        "text": reply["text"],
+                        "source": reply["source"],
+                    }
+                    yield json.dumps({"type": "snapshot", "snapshot": snapshot}) + "\n"
+                    continue
+                yield json.dumps(event) + "\n"
+        except RuntimeError as exc:
+            yield json.dumps({"type": "error", "detail": str(exc)}) + "\n"
+
+    return StreamingResponse(stream_events(), media_type="application/x-ndjson")
+
+
+@app.post("/api/npcs/{npc_id}/leave")
+def leave_npc(npc_id: str, request: RunScopedRequest) -> dict:
+    world = get_world()
+    if npc_id not in world.npcs:
+        raise HTTPException(status_code=404, detail="NPC not found")
+
+    state = get_run_state(request.run_id)
+    if state.run_result is not None:
+        raise HTTPException(status_code=400, detail="Run is already complete")
+
+    app.state.dialogue.leave(world, state, npc_id)
+    save_run_snapshot(state_to_dict(state))
+    return build_authoritative_snapshot(state)

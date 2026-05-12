@@ -16,7 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 llm = [
-  "agent-framework>=1.2.2,<2.0.0",
+  "agent-framework",
 ]
 
 [tool.hatch.build.targets.wheel]

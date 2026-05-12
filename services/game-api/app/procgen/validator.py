@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from collections import deque
 
+from ..content import WALKABLE_MAP_GLYPHS
+
 
 def validate_floor(ascii_map: list[str], entry: tuple[int, int], exit_point: tuple[int, int]) -> dict:
     height = len(ascii_map)
     width = len(ascii_map[0]) if height else 0
-    walkable = {".", "<"}
+    walkable = WALKABLE_MAP_GLYPHS
 
     def neighbors(x: int, y: int) -> list[tuple[int, int]]:
         points: list[tuple[int, int]] = []

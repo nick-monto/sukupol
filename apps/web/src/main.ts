@@ -1,6 +1,6 @@
 import "./styles.css";
 
-import { bindInteractionHandlers, bindNpcSelection, syncBusyState } from "./controller";
+import { bindInteractionHandlers, bindNpcSelection, leaveNpcConversation, syncBusyState } from "./controller";
 import { renderApp } from "./render";
 import type { AppState } from "./types";
 import { createAppMarkup, getUiElements } from "./ui";
@@ -12,6 +12,9 @@ const state: AppState = {
   runId: "",
   snapshot: null,
   selectedNpcId: "",
+  dialogueThreads: {},
+  streamingDialogue: null,
+  viewportTransition: "none",
   busy: false,
 };
 
@@ -37,10 +40,22 @@ render();
 
 function render(): void {
   renderApp(ui, state);
+  state.viewportTransition = "none";
+  syncBusyState(ui, state);
 
-  bindNpcSelection(ui, (npcId) => {
+  bindNpcSelection(ui, async (npcId) => {
     if (!npcId) {
       return;
+    }
+
+    if (state.selectedNpcId && state.selectedNpcId !== npcId) {
+      await leaveNpcConversation({
+        apiBase,
+        state,
+        ui,
+        render,
+        renderError,
+      }, state.selectedNpcId);
     }
 
     state.selectedNpcId = npcId;
@@ -50,5 +65,13 @@ function render(): void {
 
 function renderError(error: unknown): void {
   const message = error instanceof Error ? error.message : "Unknown error";
-  ui.dialogueLog.textContent = message;
+  const threadId = state.selectedNpcId || state.streamingDialogue?.npc_id || state.snapshot?.dialogue?.npc_id || "__system__";
+  const thread = state.dialogueThreads[threadId] ?? [];
+  thread.push({
+    id: `system-${Date.now()}-${thread.length}`,
+    speaker: "system",
+    text: message,
+  });
+  state.dialogueThreads[threadId] = thread;
+  render();
 }

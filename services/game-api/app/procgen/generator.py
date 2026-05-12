@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 
+from ..content import DECORATIVE_FLOOR_GLYPHS
 from .models import FloorLayout, RectRoom
 from .validator import validate_floor
 
@@ -34,6 +35,31 @@ def room_overlaps(room: RectRoom, other: RectRoom) -> bool:
 def derive_floor_seed(run_seed: int, floor_number: int, biome_id: str, attempt: int) -> int:
     biome_hash = sum(ord(character) for character in biome_id)
     return run_seed + (floor_number * 10_003) + biome_hash + attempt * 97
+
+
+def apply_floor_dressing(
+    grid: list[list[str]],
+    randomizer: random.Random,
+    protected_tiles: set[tuple[int, int]],
+) -> None:
+    for y, row in enumerate(grid):
+        for x, glyph in enumerate(row):
+            if glyph != "." or (x, y) in protected_tiles:
+                continue
+
+            wall_neighbors = sum(
+                1
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                if grid[y + dy][x + dx] == "#"
+            )
+            roll = randomizer.random()
+
+            if wall_neighbors >= 2 and roll < 0.32:
+                grid[y][x] = ","
+            elif wall_neighbors == 1 and roll < 0.18:
+                grid[y][x] = ";"
+            elif wall_neighbors == 0 and roll < 0.08:
+                grid[y][x] = randomizer.choice(tuple(sorted(DECORATIVE_FLOOR_GLYPHS)))
 
 
 def generate_floor(run_seed: int, biome: dict, floor_number: int) -> FloorLayout:
@@ -87,6 +113,14 @@ def _generate_candidate(floor_seed: int, biome: dict, floor_number: int) -> Floo
 
     entry_x, entry_y = rooms[0].center
     exit_x, exit_y = rooms[-1].center
+    protected_tiles = {(entry_x, entry_y), (exit_x, exit_y)}
+    for origin_x, origin_y in ((entry_x, entry_y), (exit_x, exit_y)):
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            tile_x = origin_x + dx
+            tile_y = origin_y + dy
+            if 0 <= tile_x < width and 0 <= tile_y < height:
+                protected_tiles.add((tile_x, tile_y))
+    apply_floor_dressing(grid, randomizer, protected_tiles)
     grid[entry_y][entry_x] = "<"
     grid[exit_y][exit_x] = "."
 

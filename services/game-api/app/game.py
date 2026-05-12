@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 from uuid import uuid4
 
-from .content import WorldContent
+from .content import DECORATIVE_FLOOR_GLYPHS, WALKABLE_MAP_GLYPHS, WorldContent
+from .db import list_player_npc_journal
 
 
 FACING_ORDER = ("N", "E", "S", "W")
@@ -36,6 +37,7 @@ class RunState:
     message: str
     created_at: str
     run_seed: int
+    steps_taken: int = 0
     dungeon_instance_id: str | None = None
     floor_number: int | None = None
     procgen_version: str | None = None
@@ -49,6 +51,7 @@ class RunState:
     triggered_encounters: list[str] | None = None
     outcome_summary: dict[str, Any] | None = None
     progression: dict[str, Any] | None = None
+    active_dialogue_visits: dict[str, dict[str, Any]] | None = None
 
 
 def utc_now() -> str:
@@ -77,6 +80,7 @@ def create_run(world: WorldContent, player_name: str) -> RunState:
         message="You arrive in Sukupol and steady yourself before the first descent.",
         created_at=utc_now(),
         run_seed=run_seed,
+        steps_taken=0,
         inventory=starting_inventory,
         equipped_weapon=equipped_weapon,
         triggered_encounters=[],
@@ -103,6 +107,7 @@ def state_from_dict(payload: dict[str, Any]) -> RunState:
         message=payload["message"],
         created_at=payload["created_at"],
         run_seed=payload.get("run_seed", 0),
+        steps_taken=payload.get("steps_taken", 0),
         dungeon_instance_id=payload.get("dungeon_instance_id"),
         floor_number=payload.get("floor_number"),
         procgen_version=payload.get("procgen_version"),
@@ -116,6 +121,7 @@ def state_from_dict(payload: dict[str, Any]) -> RunState:
         triggered_encounters=payload.get("triggered_encounters", []),
         outcome_summary=payload.get("outcome_summary"),
         progression=payload.get("progression"),
+        active_dialogue_visits=payload.get("active_dialogue_visits", {}),
     )
 
 
@@ -143,7 +149,29 @@ def resolve_location(world: WorldContent, location_id: str) -> dict[str, Any]:
 
 
 def is_walkable(tile: str) -> bool:
-    return tile in {".", ">", "<"}
+    return tile in WALKABLE_MAP_GLYPHS
+
+
+def direction_for_delta(dx: int, dy: int) -> str:
+    for facing, delta in FACING_DELTAS.items():
+        if delta == (dx, dy):
+            return facing
+    return "N"
+
+
+def encounter_context_for_location(world: WorldContent, location: dict[str, Any]) -> dict[str, Any]:
+    biome_id = location.get("encounter_biome_id") or location.get("biome_id")
+    biome = world.dungeon_biomes.get(biome_id) if biome_id else None
+    enabled = bool(location.get("encounter_enabled", False))
+    floor_number = int(location.get("encounter_floor", location.get("floor_number", 0) or 0))
+    encounter_rate = int(location.get("encounter_rate", biome.get("encounter_rate", 0) if biome else 0))
+    return {
+        "enabled": enabled and biome_id is not None and encounter_rate > 0,
+        "biome_id": biome_id,
+        "floor_number": floor_number,
+        "encounter_rate": encounter_rate,
+        "location_type": str(location.get("location_type", "site")),
+    }
 
 
 def action_delta(facing: str, reverse: bool = False) -> tuple[int, int]:
@@ -151,13 +179,14 @@ def action_delta(facing: str, reverse: bool = False) -> tuple[int, int]:
     return (-dx, -dy) if reverse else (dx, dy)
 
 
-def try_move(
+def try_move_delta(
     world: WorldContent,
     state: RunState,
-    reverse: bool = False,
+    dx: int,
+    dy: int,
+    message: str,
     transition_handler: TransitionHandler | None = None,
 ) -> RunState:
-    dx, dy = action_delta(state.facing, reverse=reverse)
     next_x = state.x + dx
     next_y = state.y + dy
     tile = tile_at(world, state.location_id, next_x, next_y)
@@ -167,9 +196,28 @@ def try_move(
 
     state.x = next_x
     state.y = next_y
-    state.message = "You advance with measured steps." if not reverse else "You fall back and keep your stance."
+    state.facing = direction_for_delta(dx, dy)
+    state.steps_taken += 1
+    state.message = message
     apply_exit(world, state, transition_handler=transition_handler)
     return state
+
+
+def try_move(
+    world: WorldContent,
+    state: RunState,
+    reverse: bool = False,
+    transition_handler: TransitionHandler | None = None,
+) -> RunState:
+    dx, dy = action_delta(state.facing, reverse=reverse)
+    return try_move_delta(
+        world,
+        state,
+        dx,
+        dy,
+        "You advance with measured steps." if not reverse else "You fall back and keep your stance.",
+        transition_handler=transition_handler,
+    )
 
 
 def apply_exit(
@@ -209,6 +257,15 @@ def perform_action(
     if state.in_combat:
         state.message = "You cannot move while locked in combat."
         return state
+    cardinal_moves = {
+        "move_north": (0, -1, "You move north across the map."),
+        "move_east": (1, 0, "You move east across the map."),
+        "move_south": (0, 1, "You move south across the map."),
+        "move_west": (-1, 0, "You move west across the map."),
+    }
+    if action in cardinal_moves:
+        dx, dy, message = cardinal_moves[action]
+        return try_move_delta(world, state, dx, dy, message, transition_handler=transition_handler)
     if action == "forward":
         return try_move(world, state, transition_handler=transition_handler)
     if action == "backward":
@@ -237,6 +294,7 @@ def nearby_npcs(world: WorldContent, state: RunState) -> list[dict[str, Any]]:
                 {
                     "id": npc["id"],
                     "display_name": npc["display_name"],
+                    "ascii_art": npc.get("ascii_art", []),
                     "role": npc["role"],
                     "distance": distance,
                 }
@@ -245,95 +303,63 @@ def nearby_npcs(world: WorldContent, state: RunState) -> list[dict[str, Any]]:
     return npcs
 
 
-def render_minimap(world: WorldContent, state: RunState) -> list[str]:
+def render_map_scene(world: WorldContent, state: RunState) -> dict[str, Any]:
     location = resolve_location(world, state.location_id)
     rows = [list(row) for row in location["ascii_map"]]
+    cells: list[dict[str, Any]] = []
+
+    for y, row in enumerate(rows):
+        for x, glyph in enumerate(row):
+            tone = map_tone_for_glyph(glyph)
+            cells.append({"x": x, "y": y, "glyph": glyph, "tone": tone})
 
     for npc in world.npcs.values():
         if npc["location_id"] == state.location_id:
             rows[npc["y"]][npc["x"]] = npc["display_name"][0].upper()
+            cells.append(
+                {
+                    "x": npc["x"],
+                    "y": npc["y"],
+                    "glyph": npc["display_name"][0].upper(),
+                    "tone": "npc",
+                }
+            )
 
     rows[state.y][state.x] = {"N": "^", "E": ">", "S": "v", "W": "<"}[state.facing]
-    return ["".join(row) for row in rows]
-
-
-def render_first_person(world: WorldContent, state: RunState) -> list[str]:
-    width = 27
-    height = 13
-    canvas = [[" " for _ in range(width)] for _ in range(height)]
-    frames = {
-        1: (1, 1, 25, 11),
-        2: (5, 3, 21, 9),
-        3: (9, 5, 17, 7),
+    cells.append(
+        {
+            "x": state.x,
+            "y": state.y,
+            "glyph": {"N": "^", "E": ">", "S": "v", "W": "<"}[state.facing],
+            "tone": "player",
+        }
+    )
+    return {
+        "rows": ["".join(row) for row in rows],
+        "metadata": {
+            "width": len(rows[0]) if rows else 0,
+            "height": len(rows),
+            "player_x": state.x,
+            "player_y": state.y,
+            "cells": cells,
+        },
     }
 
-    def set_cell(x: int, y: int, value: str) -> None:
-        if 0 <= x < width and 0 <= y < height:
-            canvas[y][x] = value
 
-    def draw_box(bounds: tuple[int, int, int, int], edge: str) -> None:
-        left, top, right, bottom = bounds
-        for x in range(left, right + 1):
-            set_cell(x, top, edge)
-            set_cell(x, bottom, edge)
-        for y in range(top, bottom + 1):
-            set_cell(left, y, edge)
-            set_cell(right, y, edge)
-
-    def draw_side(depth: int, side: str, edge: str) -> None:
-        left, top, right, bottom = frames[depth]
-        next_bounds = frames.get(depth + 1)
-        if side == "left":
-            for y in range(top, bottom + 1):
-                set_cell(left, y, edge)
-            if next_bounds:
-                next_left, next_top, _, next_bottom = next_bounds
-                for offset in range(next_top - top + 1):
-                    set_cell(left + offset, top + offset, "/")
-                    set_cell(left + offset, bottom - offset, "\\")
-                for y in range(next_top, next_bottom + 1):
-                    set_cell(next_left, y, edge)
-        else:
-            for y in range(top, bottom + 1):
-                set_cell(right, y, edge)
-            if next_bounds:
-                _, next_top, next_right, next_bottom = next_bounds
-                for offset in range(next_top - top + 1):
-                    set_cell(right - offset, top + offset, "\\")
-                    set_cell(right - offset, bottom - offset, "/")
-                for y in range(next_top, next_bottom + 1):
-                    set_cell(next_right, y, edge)
-
-    left_facing = turn_left(state.facing)
-    right_facing = turn_right(state.facing)
-    for depth in range(1, 4):
-        dx, dy = FACING_DELTAS[state.facing]
-        tile_x = state.x + dx * depth
-        tile_y = state.y + dy * depth
-        front_tile = tile_at(world, state.location_id, tile_x, tile_y)
-        left_dx, left_dy = FACING_DELTAS[left_facing]
-        right_dx, right_dy = FACING_DELTAS[right_facing]
-        left_tile = tile_at(world, state.location_id, tile_x + left_dx, tile_y + left_dy)
-        right_tile = tile_at(world, state.location_id, tile_x + right_dx, tile_y + right_dy)
-
-        if front_tile == "#":
-            draw_box(frames[depth], "#")
-            break
-
-        draw_side(depth, "left", "|") if left_tile == "#" else None
-        draw_side(depth, "right", "|") if right_tile == "#" else None
-
-        if depth == 3:
-            set_cell(width // 2, height // 2, ".")
-
-    horizon = height // 2 + 3
-    for x in range(width):
-        set_cell(x, horizon, "_")
-    return ["".join(row).rstrip() for row in canvas]
+def map_tone_for_glyph(glyph: str) -> str:
+    if glyph == "#":
+        return "wall"
+    if glyph in {">", "<"}:
+        return "exit"
+    if glyph in DECORATIVE_FLOOR_GLYPHS:
+        return "decor"
+    return "floor"
 
 
 def build_snapshot(world: WorldContent, state: RunState) -> dict[str, Any]:
     location = resolve_location(world, state.location_id)
+    map_scene = render_map_scene(world, state)
+    encounter_context = encounter_context_for_location(world, location)
     return {
         "run_id": state.id,
         "player_name": state.player_name,
@@ -343,6 +369,12 @@ def build_snapshot(world: WorldContent, state: RunState) -> dict[str, Any]:
             "description": location["description"],
             "floor_number": location.get("floor_number"),
             "biome_id": location.get("biome_id"),
+            "type": encounter_context["location_type"],
+            "encounter_enabled": encounter_context["enabled"],
+        },
+        "position": {
+            "x": state.x,
+            "y": state.y,
         },
         "stats": {
             "hp": state.hp,
@@ -351,8 +383,8 @@ def build_snapshot(world: WorldContent, state: RunState) -> dict[str, Any]:
         },
         "facing": state.facing,
         "message": state.message,
-        "first_person_view": render_first_person(world, state),
-        "minimap": render_minimap(world, state),
+        "map_view": map_scene["rows"],
+        "map_metadata": map_scene["metadata"],
         "nearby_npcs": nearby_npcs(world, state),
         "run_seed": state.run_seed,
         "inventory": state.inventory or [],
@@ -364,5 +396,6 @@ def build_snapshot(world: WorldContent, state: RunState) -> dict[str, Any]:
         "enemies_defeated": state.enemies_defeated,
         "outcome_summary": state.outcome_summary,
         "progression": state.progression,
+        "journal": list_player_npc_journal(state.player_id),
         "serialized_state": state_to_dict(state),
     }
