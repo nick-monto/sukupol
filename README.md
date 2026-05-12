@@ -66,6 +66,41 @@ The current NPC dialogue implementation is intentionally conservative. The backe
 
 Set `SUKUPOL_DIALOGUE_MODE=agent-framework` when that path is implemented and wired to a local provider.
 
+### Local llama.cpp server
+
+If you want to run NPC dialogue against a local `llama.cpp` build, start an OpenAI-compatible `llama-server` instance and point the backend at it.
+
+Build `llama.cpp` locally if needed:
+
+```bash
+git clone https://github.com/TheTom/llama-cpp-turboquant
+cd llama.cpp
+cmake -B build -DGGML_CUDA=ON -DGGML_NATIVE=ON -DCMAKE_CUDA_COMPILER:PATH=/usr/local/cuda/bin/nvcc
+cmake --build build --config Release -j$(nproc)
+```
+
+Launch the server from the root of your local `llama.cpp` checkout, or replace `./build/bin/llama-server` with an absolute path:
+```bash
+chmod u+x LLM_BACKEND_LAUNCH_CONFIG.sh
+./LLM_BACKEND_LAUNCH_CONFIG.sh
+```
+
+Then start the game API with the local-LLM settings:
+
+```bash
+cd services/game-api
+source .venv/bin/activate
+export SUKUPOL_DIALOGUE_MODE=agent-framework
+export SUKUPOL_OPENAI_BASE_URL=http://127.0.0.1:8033
+uvicorn app.main:app --reload
+```
+
+Quick smoke test for the LLM server:
+
+```bash
+curl http://127.0.0.1:8033/v1/models
+```
+
 ## Next implementation targets
 
 1. Replace the fallback dialogue path with Agent Framework plus a local chat client.
