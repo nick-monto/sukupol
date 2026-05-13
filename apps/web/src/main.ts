@@ -14,7 +14,10 @@ const state: AppState = {
   selectedNpcId: "",
   dialogueThreads: {},
   streamingDialogue: null,
+  messageSequence: 0,
   viewportTransition: "none",
+  presentationLock: null,
+  presentationToken: 0,
   busy: false,
 };
 
@@ -39,8 +42,10 @@ bindInteractionHandlers({
 render();
 
 function render(): void {
-  renderApp(ui, state);
-  state.viewportTransition = "none";
+  renderApp(ui, state, handleViewportTransitionComplete);
+  if (state.viewportTransition !== "combat-exit") {
+    state.viewportTransition = "none";
+  }
   syncBusyState(ui, state);
 
   bindNpcSelection(ui, async (npcId) => {
@@ -63,15 +68,18 @@ function render(): void {
   });
 }
 
+function handleViewportTransitionComplete(token: number): void {
+  if (state.presentationLock?.token !== token) {
+    return;
+  }
+
+  state.presentationLock = null;
+  state.viewportTransition = "none";
+  render();
+}
+
 function renderError(error: unknown): void {
   const message = error instanceof Error ? error.message : "Unknown error";
-  const threadId = state.selectedNpcId || state.streamingDialogue?.npc_id || state.snapshot?.dialogue?.npc_id || "__system__";
-  const thread = state.dialogueThreads[threadId] ?? [];
-  thread.push({
-    id: `system-${Date.now()}-${thread.length}`,
-    speaker: "system",
-    text: message,
-  });
-  state.dialogueThreads[threadId] = thread;
+  console.error(message, error);
   render();
 }

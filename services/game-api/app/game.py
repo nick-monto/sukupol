@@ -5,8 +5,9 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 from uuid import uuid4
 
-from .content import DECORATIVE_FLOOR_GLYPHS, WALKABLE_MAP_GLYPHS, WorldContent
+from .content import WALKABLE_MAP_GLYPHS, WorldContent
 from .db import list_player_npc_journal
+from .quests import list_serialized_player_quests
 
 
 FACING_ORDER = ("N", "E", "S", "W")
@@ -19,6 +20,9 @@ FACING_DELTAS = {
 
 
 TransitionHandler = Callable[["RunState", dict[str, Any]], bool]
+
+
+ConnectionPair = list[str]
 
 
 @dataclass
@@ -52,6 +56,8 @@ class RunState:
     outcome_summary: dict[str, Any] | None = None
     progression: dict[str, Any] | None = None
     active_dialogue_visits: dict[str, dict[str, Any]] | None = None
+    discovered_overworld_locations: list[str] | None = None
+    discovered_overworld_connections: list[ConnectionPair] | None = None
 
 
 def utc_now() -> str:
@@ -65,6 +71,7 @@ def create_run(world: WorldContent, player_name: str) -> RunState:
     spawn = world.player_spawn
     starting_inventory = [dict(item) for item in world.starting_inventory]
     equipped_weapon = next((item["item_id"] for item in starting_inventory if item.get("equipped")), None)
+    discovered_locations = [spawn["location_id"]] if is_overworld_mapped_location(world, spawn["location_id"]) else []
     return RunState(
         id=run_id,
         player_id=player_id,
@@ -84,6 +91,8 @@ def create_run(world: WorldContent, player_name: str) -> RunState:
         inventory=starting_inventory,
         equipped_weapon=equipped_weapon,
         triggered_encounters=[],
+        discovered_overworld_locations=discovered_locations,
+        discovered_overworld_connections=[],
     )
 
 
@@ -92,6 +101,8 @@ def state_to_dict(state: RunState) -> dict[str, Any]:
 
 
 def state_from_dict(payload: dict[str, Any]) -> RunState:
+    discovered_locations = normalize_overworld_locations(payload.get("discovered_overworld_locations", []))
+    discovered_connections = normalize_overworld_connections(payload.get("discovered_overworld_connections", []))
     return RunState(
         id=payload["id"],
         player_id=payload["player_id"],
@@ -122,7 +133,158 @@ def state_from_dict(payload: dict[str, Any]) -> RunState:
         outcome_summary=payload.get("outcome_summary"),
         progression=payload.get("progression"),
         active_dialogue_visits=payload.get("active_dialogue_visits", {}),
+        discovered_overworld_locations=discovered_locations,
+        discovered_overworld_connections=discovered_connections,
     )
+
+
+def overworld_map_data(location: dict[str, Any]) -> dict[str, int] | None:
+    raw = location.get("overworld_map")
+    if not isinstance(raw, dict):
+        return None
+
+    x = raw.get("x")
+    y = raw.get("y")
+    if not isinstance(x, int) or not isinstance(y, int):
+        return None
+
+    return {"x": x, "y": y}
+
+
+def is_overworld_mapped_location(world: WorldContent, location_id: str) -> bool:
+    location = world.locations.get(location_id)
+    if location is None:
+        return False
+    return overworld_map_data(location) is not None
+
+
+def normalize_connection_pair(location_a: Any, location_b: Any) -> ConnectionPair | None:
+    if not isinstance(location_a, str) or not isinstance(location_b, str):
+        return None
+
+    first = location_a.strip()
+    second = location_b.strip()
+    if not first or not second or first == second:
+        return None
+
+    return sorted((first, second))
+
+
+def normalize_overworld_locations(raw_locations: Any) -> list[str]:
+    if not isinstance(raw_locations, list):
+        return []
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for location_id in raw_locations:
+        if not isinstance(location_id, str):
+            continue
+        candidate = location_id.strip()
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        normalized.append(candidate)
+    return normalized
+
+
+def normalize_overworld_connections(raw_connections: Any) -> list[ConnectionPair]:
+    if not isinstance(raw_connections, list):
+        return []
+
+    normalized: list[ConnectionPair] = []
+    seen: set[tuple[str, str]] = set()
+    for candidate in raw_connections:
+        if not isinstance(candidate, (list, tuple)) or len(candidate) != 2:
+            continue
+        pair = normalize_connection_pair(candidate[0], candidate[1])
+        if pair is None:
+            continue
+        pair_key = (pair[0], pair[1])
+        if pair_key in seen:
+            continue
+        seen.add(pair_key)
+        normalized.append(pair)
+    return normalized
+
+
+def reveal_overworld_location(world: WorldContent, state: RunState, location_id: str) -> None:
+    if not is_overworld_mapped_location(world, location_id):
+        return
+
+    locations = normalize_overworld_locations(state.discovered_overworld_locations or [])
+    if location_id not in locations:
+        locations.append(location_id)
+    state.discovered_overworld_locations = locations
+
+
+def reveal_overworld_connection(world: WorldContent, state: RunState, location_a: str, location_b: str) -> None:
+    if not is_overworld_mapped_location(world, location_a) or not is_overworld_mapped_location(world, location_b):
+        return
+
+    pair = normalize_connection_pair(location_a, location_b)
+    if pair is None:
+        return
+
+    reveal_overworld_location(world, state, pair[0])
+    reveal_overworld_location(world, state, pair[1])
+    connections = normalize_overworld_connections(state.discovered_overworld_connections or [])
+    if pair not in connections:
+        connections.append(pair)
+    state.discovered_overworld_connections = connections
+
+
+def build_overworld_map(world: WorldContent, state: RunState) -> dict[str, Any] | None:
+    nodes: list[dict[str, Any]] = []
+    connections_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    discovered_locations = set(normalize_overworld_locations(state.discovered_overworld_locations or []))
+    discovered_connections = {
+        tuple(pair)
+        for pair in normalize_overworld_connections(state.discovered_overworld_connections or [])
+    }
+
+    for location in world.locations.values():
+        map_position = overworld_map_data(location)
+        if map_position is None:
+            continue
+        nodes.append(
+            {
+                "id": location["id"],
+                "name": location["name"],
+                "x": map_position["x"],
+                "y": map_position["y"],
+                "discovered": location["id"] in discovered_locations,
+            }
+        )
+        for exit_node in location.get("exits", []):
+            if exit_node.get("transition"):
+                continue
+            target_location_id = exit_node.get("target_location_id")
+            if not isinstance(target_location_id, str) or not is_overworld_mapped_location(world, target_location_id):
+                continue
+            pair = normalize_connection_pair(location["id"], target_location_id)
+            if pair is None:
+                continue
+            pair_key = (pair[0], pair[1])
+            if pair_key not in connections_by_key:
+                connections_by_key[pair_key] = {
+                    "location_ids": pair,
+                    "discovered": pair_key in discovered_connections,
+                }
+
+    if not nodes:
+        return None
+
+    nodes.sort(key=lambda node: (node["y"], node["x"], node["id"]))
+    connections = sorted(
+        connections_by_key.values(),
+        key=lambda connection: (connection["location_ids"][0], connection["location_ids"][1]),
+    )
+    current_location_id = state.location_id if is_overworld_mapped_location(world, state.location_id) else None
+    return {
+        "current_location_id": current_location_id,
+        "nodes": nodes,
+        "connections": connections,
+    }
 
 
 def turn_left(facing: str) -> str:
@@ -226,6 +388,7 @@ def apply_exit(
     transition_handler: TransitionHandler | None = None,
 ) -> None:
     location = resolve_location(world, state.location_id)
+    previous_location_id = state.location_id
     for exit_node in location.get("exits", []):
         if exit_node["x"] == state.x and exit_node["y"] == state.y:
             if exit_node.get("transition") == "generated_dungeon":
@@ -242,6 +405,8 @@ def apply_exit(
             elif state.location_id in world.locations:
                 state.floor_number = None
             state.message = exit_node["message"]
+            reveal_overworld_location(world, state, state.location_id)
+            reveal_overworld_connection(world, state, previous_location_id, state.location_id)
             return
 
 
@@ -311,7 +476,13 @@ def render_map_scene(world: WorldContent, state: RunState) -> dict[str, Any]:
     for y, row in enumerate(rows):
         for x, glyph in enumerate(row):
             tone = map_tone_for_glyph(glyph)
-            cells.append({"x": x, "y": y, "glyph": glyph, "tone": tone})
+            cell = {"x": x, "y": y, "glyph": glyph, "tone": tone}
+            variant = map_variant_for_position(location, rows, x, y, glyph)
+            if variant is not None:
+                cell["variant"] = variant
+                if tone == "floor" and variant != "plain":
+                    cell["tone"] = "decor"
+            cells.append(cell)
 
     for npc in world.npcs.values():
         if npc["location_id"] == state.location_id:
@@ -349,14 +520,64 @@ def render_map_scene(world: WorldContent, state: RunState) -> dict[str, Any]:
 def map_tone_for_glyph(glyph: str) -> str:
     if glyph == "#":
         return "wall"
-    if glyph in {">", "<"}:
+    if glyph in {"<", "∪", "∩"}:
         return "exit"
-    if glyph in DECORATIVE_FLOOR_GLYPHS:
-        return "decor"
     return "floor"
 
 
+def map_variant_for_position(
+    location: dict[str, Any],
+    rows: list[list[str]],
+    x: int,
+    y: int,
+    glyph: str,
+) -> str | None:
+    if glyph not in WALKABLE_MAP_GLYPHS:
+        return None
+    if glyph in {"<", "∪", "∩"}:
+        return "threshold"
+
+    biome_id = location.get("biome_id", "")
+    location_type = location.get("location_type", "")
+    checksum = sum(ord(character) for character in f"{location['id']}:{biome_id}:{location_type}") + (x * 17) + (y * 31)
+    wall_neighbors = count_adjacent_walls(rows, x, y)
+
+    if biome_id == "whispering_caverns" and checksum % 4 == 0:
+        return "wet"
+    if biome_id == "ancient_halls" and wall_neighbors >= 2 and checksum % 3 == 0:
+        return "rubble"
+    if biome_id == "sunken_archive" and (checksum + wall_neighbors) % 3 == 0:
+        return "wet"
+    if location_type in {"town", "overworld"} and checksum % 6 == 0:
+        return "dust"
+    if wall_neighbors >= 2 and checksum % 5 == 0:
+        return "moss"
+    if wall_neighbors >= 1 and checksum % 4 == 0:
+        return "rubble"
+    return "plain"
+
+
+def count_adjacent_walls(rows: list[list[str]], x: int, y: int) -> int:
+    height = len(rows)
+    width = len(rows[0]) if height else 0
+    count = 0
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        next_x = x + dx
+        next_y = y + dy
+        if not (0 <= next_x < width and 0 <= next_y < height):
+            continue
+        if rows[next_y][next_x] == "#":
+            count += 1
+    return count
+
+
 def build_snapshot(world: WorldContent, state: RunState) -> dict[str, Any]:
+    combat_state = state.combat_state
+    if state.in_combat and combat_state is not None:
+        from .combat import normalize_combat_state
+
+        combat_state = normalize_combat_state(world, state)
+
     location = resolve_location(world, state.location_id)
     map_scene = render_map_scene(world, state)
     encounter_context = encounter_context_for_location(world, location)
@@ -387,15 +608,25 @@ def build_snapshot(world: WorldContent, state: RunState) -> dict[str, Any]:
         "map_metadata": map_scene["metadata"],
         "nearby_npcs": nearby_npcs(world, state),
         "run_seed": state.run_seed,
-        "inventory": state.inventory or [],
+        "inventory": [
+            {
+                **entry,
+                "name": world.items.get(entry["item_id"], {}).get("name", entry["item_id"]),
+                "item_type": world.items.get(entry["item_id"], {}).get("item_type", "unknown"),
+                "description": world.items.get(entry["item_id"], {}).get("description", ""),
+            }
+            for entry in (state.inventory or [])
+        ],
         "equipped_weapon": state.equipped_weapon,
         "in_combat": state.in_combat,
-        "combat_state": state.combat_state,
+        "combat_state": combat_state,
         "run_result": state.run_result,
         "run_depth": state.run_depth,
         "enemies_defeated": state.enemies_defeated,
         "outcome_summary": state.outcome_summary,
         "progression": state.progression,
+        "overworld_map": build_overworld_map(world, state),
         "journal": list_player_npc_journal(state.player_id),
+        "quests": list_serialized_player_quests(world, state),
         "serialized_state": state_to_dict(state),
     }

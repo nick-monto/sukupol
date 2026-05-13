@@ -18,6 +18,7 @@ from .db import (
     initialize_database,
     load_dungeon_floor,
     load_dungeon_floor_for_instance,
+    load_player_quest,
     load_run_snapshot,
     save_run_outcome,
     save_run_snapshot,
@@ -28,6 +29,7 @@ from .dialogue import NpcDialogueService
 from .game import RunState, build_snapshot, create_run, perform_action, state_from_dict, state_to_dict
 from .progression import finalize_run
 from .procgen.generator import generate_floor
+from .quests import accept_offered_quest, decline_offered_quest
 
 
 class StartRunRequest(BaseModel):
@@ -384,3 +386,55 @@ def leave_npc(npc_id: str, request: RunScopedRequest) -> dict:
     app.state.dialogue.leave(world, state, npc_id)
     save_run_snapshot(state_to_dict(state))
     return build_authoritative_snapshot(state)
+
+
+@app.post("/api/quests/{quest_id}/accept")
+def accept_quest(quest_id: str, request: RunScopedRequest) -> dict:
+    world = get_world()
+    state = get_run_state(request.run_id)
+    row = load_player_quest(state.player_id, quest_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Quest not found")
+    nearby_ids = {npc["id"] for npc in build_snapshot(world, state)["nearby_npcs"]}
+    if row["offered_by_npc_id"] not in nearby_ids:
+        raise HTTPException(status_code=400, detail="Quest giver is not nearby")
+
+    try:
+        quest = accept_offered_quest(world, state, quest_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    save_run_snapshot(state_to_dict(state))
+    snapshot = build_authoritative_snapshot(state)
+    snapshot["dialogue"] = {
+        "npc_id": quest["offered_by_npc_id"],
+        "npc_name": quest["offered_by_npc_name"],
+        "text": f"{quest['offered_by_npc_name']}: {quest['response_text']}",
+        "source": "quest",
+    }
+    return snapshot
+
+
+@app.post("/api/quests/{quest_id}/decline")
+def decline_quest(quest_id: str, request: RunScopedRequest) -> dict:
+    world = get_world()
+    state = get_run_state(request.run_id)
+    row = load_player_quest(state.player_id, quest_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Quest not found")
+    nearby_ids = {npc["id"] for npc in build_snapshot(world, state)["nearby_npcs"]}
+    if row["offered_by_npc_id"] not in nearby_ids:
+        raise HTTPException(status_code=400, detail="Quest giver is not nearby")
+
+    try:
+        quest = decline_offered_quest(world, state, quest_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    save_run_snapshot(state_to_dict(state))
+    snapshot = build_authoritative_snapshot(state)
+    snapshot["dialogue"] = {
+        "npc_id": quest["offered_by_npc_id"],
+        "npc_name": quest["offered_by_npc_name"],
+        "text": f"{quest['offered_by_npc_name']}: {quest['response_text']}",
+        "source": "quest",
+    }
+    return snapshot

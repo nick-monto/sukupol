@@ -1,14 +1,18 @@
 import { hideMap, renderMap } from "./viewport";
-import type { AppState, DialogueMessage, Snapshot } from "./types";
+import type { AppState, CombatPartySlot, DialogueMessage, OverworldMap, Snapshot } from "./types";
 import type { UiElements } from "./ui";
 
 const transitionTimers = new WeakMap<HTMLElement, number>();
 
-export function renderApp(ui: UiElements, state: AppState): void {
-  const snapshot = state.snapshot;
+export function renderApp(
+  ui: UiElements,
+  state: AppState,
+  onViewportTransitionComplete?: (token: number) => void,
+): void {
+  const snapshot = getPresentedSnapshot(state);
   ui.heroSummary.innerHTML = renderHeroSummary(snapshot);
   ui.expeditionSignal.textContent = renderExpeditionSignal(snapshot);
-  applyPresentationState(ui, state);
+  applyPresentationState(ui, state, snapshot);
 
   if (!snapshot) {
     ui.locationName.textContent = "No run started";
@@ -16,11 +20,15 @@ export function renderApp(ui: UiElements, state: AppState): void {
     ui.locationDescription.textContent = "Bring up the backend and start a run to render the traversal map.";
     ui.viewport.textContent = "Stand up the backend and begin a run.";
     hideMap(ui.viewportPixiStage);
-    ui.messageLabel.textContent = "Field report";
-    ui.messageLog.textContent = "Awaiting input.";
+    ui.overworldMap.innerHTML = renderOverworldMap(null);
     ui.inventoryList.innerHTML = "<p class=\"small empty-copy\">No loadout recorded.</p>";
+    ui.questList.innerHTML = renderQuestEmpty("No contracts recorded.");
     ui.npcList.innerHTML = "<p class=\"small empty-copy\">No contacts in range.</p>";
-    ui.dialogueLog.innerHTML = renderChatEmpty("No active channel. Begin a run and choose a nearby contact.");
+    ui.combatOverlay.hidden = true;
+    ui.combatOverlay.innerHTML = "";
+    ui.dialogueLog.innerHTML = renderUnifiedTranscript(null, state);
+    ui.combatActions.innerHTML = "";
+    ui.questChoicePanel.innerHTML = "";
     ui.outcomeLog.textContent = "No completed run yet.";
     ui.journalList.innerHTML = renderJournalEmpty("Leave a conversation to record it here.");
     return;
@@ -37,23 +45,30 @@ export function renderApp(ui: UiElements, state: AppState): void {
     lines: snapshot.map_view,
     metadata: snapshot.map_metadata ?? null,
     transition: state.viewportTransition,
+    onTransitionComplete: state.presentationLock?.transition === "combat-exit"
+      ? () => onViewportTransitionComplete?.(state.presentationLock?.token ?? 0)
+      : undefined,
   });
-  ui.messageLabel.textContent = snapshot.in_combat ? "Combat report" : "Field report";
-  ui.messageLog.textContent = snapshot.message;
+  ui.overworldMap.innerHTML = renderOverworldMap(snapshot.overworld_map ?? null);
   ui.inventoryList.innerHTML = renderInventory(snapshot);
+  ui.questList.innerHTML = renderQuestList(snapshot);
   ui.npcList.innerHTML = renderNpcList(snapshot, state.selectedNpcId);
+  ui.questChoicePanel.innerHTML = renderQuestChoicePanel(snapshot, state.selectedNpcId);
+  ui.combatOverlay.hidden = !snapshot.in_combat || !snapshot.combat_state;
+  ui.combatOverlay.innerHTML = snapshot.in_combat && snapshot.combat_state ? renderCombatOverlay(snapshot) : "";
+  ui.combatActions.innerHTML = snapshot.in_combat && snapshot.combat_state ? renderCombatActions(snapshot) : "";
 
   if (snapshot.in_combat && snapshot.combat_state) {
-    ui.logTitle.textContent = `Combat: ${snapshot.combat_state.enemy_name}`;
-    ui.logHelp.textContent = `Round ${snapshot.combat_state.round}. Movement and dialogue are locked until combat resolves.`;
-    ui.dialogueLog.innerHTML = renderCombatTranscript(snapshot);
+    ui.logTitle.textContent = `Round ${snapshot.combat_state.round}`;
+    ui.logHelp.textContent = "Recent exchanges";
   } else {
-    ui.logTitle.textContent = "Dialogue";
+    ui.logTitle.textContent = state.selectedNpcId ? "Dialogue" : "Dispatch";
     ui.logHelp.textContent = state.selectedNpcId
-      ? "A contact is tuned in. Send a question or change recipients from the slate."
-      : "No contact selected. Open the slate and choose a nearby voice.";
-    ui.dialogueLog.innerHTML = renderDialogueTranscript(snapshot, state);
+      ? "A contact is tuned in. This channel is reserved for NPC conversation."
+      : "No contact selected. Choose a nearby voice to open a conversation.";
   }
+
+  ui.dialogueLog.innerHTML = renderUnifiedTranscript(snapshot, state);
 
   ui.dialogueLog.scrollTop = ui.dialogueLog.scrollHeight;
 
@@ -63,8 +78,7 @@ export function renderApp(ui: UiElements, state: AppState): void {
   ui.journalList.innerHTML = renderJournal(snapshot);
 }
 
-function applyPresentationState(ui: UiElements, state: AppState): void {
-  const snapshot = state.snapshot;
+function applyPresentationState(ui: UiElements, state: AppState, snapshot: Snapshot | null): void {
   const shellMode = !snapshot ? "idle" : snapshot.run_result ? "archived" : snapshot.in_combat ? "combat" : "exploration";
   const contextMode = !snapshot
     ? "idle"
@@ -83,7 +97,6 @@ function applyPresentationState(ui: UiElements, state: AppState): void {
   setMode(ui.outcomePanel, snapshot?.run_result ? "archived" : "idle");
   setMode(ui.viewportPanel, snapshot?.in_combat ? "combat" : snapshot?.run_result ? "archived" : snapshot ? "exploration" : "idle");
   setMode(ui.logPanel, snapshot?.in_combat ? "combat" : state.selectedNpcId ? "tuned" : "idle");
-  setMode(ui.messageStrip, snapshot?.in_combat ? "combat" : snapshot?.run_result ? "archived" : "exploration");
   ui.playerMessage.placeholder = getMessagePlaceholder(snapshot, state.selectedNpcId);
 
   if (!snapshot) {
@@ -105,10 +118,10 @@ function applyPresentationState(ui: UiElements, state: AppState): void {
   }
 
   if (snapshot.in_combat) {
-    const enemyName = snapshot.combat_state?.enemy_name ?? "enemy";
+    const enemyName = snapshot.combat_state?.enemy.name ?? "enemy";
     ui.dispatchKicker.textContent = "Combat";
-    ui.dispatchTitle.textContent = `Engage ${enemyName}`;
-    ui.dispatchNote.textContent = "Dialogue is suspended. Commit to an action or break away if the route allows.";
+    ui.dispatchTitle.textContent = enemyName;
+    ui.dispatchNote.textContent = "Choose an action or break away.";
     ui.outcomeTitle.textContent = "Run Chronicle";
     ui.outcomeNote.textContent = "Resolved runs and the running journal of NPC visits.";
     return;
@@ -128,6 +141,20 @@ function applyPresentationState(ui: UiElements, state: AppState): void {
   ui.outcomeTitle.textContent = "Run Chronicle";
   ui.outcomeNote.textContent = "Resolved runs and the running journal of NPC visits.";
 }
+
+function getPresentedSnapshot(state: AppState): Snapshot | null {
+  const snapshot = state.snapshot;
+  if (!snapshot || !state.presentationLock) {
+    return snapshot;
+  }
+
+  return {
+    ...snapshot,
+    in_combat: true,
+    combat_state: state.presentationLock.combatState,
+  };
+}
+
 function setMode(element: HTMLElement, nextMode: string): void {
   const previousMode = element.dataset.mode;
   element.dataset.mode = nextMode;
@@ -224,14 +251,154 @@ function renderInventory(snapshot: Snapshot): string {
       return `
         <div class="inventory-item${equipped ? " is-equipped" : ""}">
           <div>
-            <strong>${item.item_id.replaceAll("_", " ")}</strong>
-            <div class="small">Qty ${item.quantity}${equipped ? " / readied" : ""}</div>
+            <strong>${escapeHtml(item.name)}</strong>
+            <div class="small">${escapeHtml(item.item_type)} / Qty ${item.quantity}${equipped ? " / readied" : ""}</div>
           </div>
-          <span class="inventory-mark">${equipped ? "Readied" : "Stored"}</span>
+          <span class="inventory-mark">${equipped ? "Readied" : item.item_type === "quest" ? "Quest" : "Stored"}</span>
         </div>
       `;
     })
     .join("");
+}
+
+function renderOverworldMap(overworldMap: OverworldMap | null): string {
+  if (!overworldMap || overworldMap.nodes.length === 0) {
+    return "<div class=\"chat-empty\">No overworld telemetry available for this expedition.</div>";
+  }
+
+  const nodeById = new Map(overworldMap.nodes.map((node) => [node.id, node]));
+  const xValues = overworldMap.nodes.map((node) => node.x);
+  const yValues = overworldMap.nodes.map((node) => node.y);
+  const minX = Math.min(...xValues);
+  const maxX = Math.max(...xValues);
+  const minY = Math.min(...yValues);
+  const maxY = Math.max(...yValues);
+  const horizontalStep = 120;
+  const verticalStep = 92;
+  const padding = 36;
+  const width = ((maxX - minX) * horizontalStep) + (padding * 2) || 240;
+  const height = ((maxY - minY) * verticalStep) + (padding * 2) || 168;
+
+  const getPoint = (nodeId: string): { x: number; y: number } | null => {
+    const node = nodeById.get(nodeId);
+    if (!node) {
+      return null;
+    }
+    return {
+      x: padding + ((node.x - minX) * horizontalStep),
+      y: padding + ((node.y - minY) * verticalStep),
+    };
+  };
+
+  const connections = overworldMap.connections
+    .map((connection) => {
+      const from = getPoint(connection.location_ids[0]);
+      const to = getPoint(connection.location_ids[1]);
+      if (!from || !to) {
+        return "";
+      }
+      return `<line class="overworld-map-link${connection.discovered ? " is-discovered" : ""}" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" />`;
+    })
+    .join("");
+
+  const nodes = overworldMap.nodes
+    .map((node) => {
+      const point = getPoint(node.id);
+      if (!point) {
+        return "";
+      }
+      const isCurrent = overworldMap.current_location_id === node.id;
+      const label = node.discovered ? escapeHtml(node.name) : "Uncharted";
+      return `
+        <g class="overworld-map-node${node.discovered ? " is-discovered" : ""}${isCurrent ? " is-current" : ""}" transform="translate(${point.x} ${point.y})">
+          <circle class="overworld-map-node-ring" r="18"></circle>
+          <circle class="overworld-map-node-core" r="9"></circle>
+          <text class="overworld-map-node-label" x="0" y="34" text-anchor="middle">${label}</text>
+        </g>
+      `;
+    })
+    .join("");
+
+  const status = overworldMap.current_location_id
+    ? `Current route anchor: ${escapeHtml(nodeById.get(overworldMap.current_location_id)?.name ?? "Unknown")}.`
+    : "Current location is below the surface; overworld telemetry remains cached.";
+
+  return `
+    <div class="overworld-map-card">
+      <p class="small overworld-map-note">${status}</p>
+      <svg class="overworld-map-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Overworld exploration map">
+        <g class="overworld-map-links">${connections}</g>
+        <g class="overworld-map-nodes">${nodes}</g>
+      </svg>
+    </div>
+  `;
+}
+
+function renderQuestList(snapshot: Snapshot): string {
+  if (snapshot.quests.length === 0) {
+    return renderQuestEmpty("No contracts active. Ask nearby NPCs if they need work done.");
+  }
+
+  return snapshot.quests
+    .map((quest) => {
+      const statusLabel = quest.status === "offered"
+        ? "Offer"
+        : quest.status === "active"
+          ? quest.can_turn_in ? "Ready to turn in" : "Active"
+          : quest.status === "completed"
+            ? "Completed"
+            : "Declined";
+      const progressText = quest.status === "offered"
+        ? `Reward ${quest.reward_gold} gold`
+        : `${quest.progress_value}/${quest.progress_target} recovered`;
+      const meta = [quest.offered_by_npc_name, quest.target_biome_name, quest.target_floor_number ? `Floor ${quest.target_floor_number}` : ""]
+        .filter(Boolean)
+        .join(" / ");
+      return `
+        <article class="quest-card is-${quest.status}">
+          <div class="quest-card-head">
+            <div>
+              <strong>${escapeHtml(quest.title)}</strong>
+              <div class="small">${escapeHtml(meta)}</div>
+            </div>
+            <span class="quest-status quest-status-${quest.status}">${escapeHtml(statusLabel)}</span>
+          </div>
+          <p class="quest-summary">${renderChatText(quest.summary)}</p>
+          <p class="quest-objective">${renderChatText(quest.objective_text)}</p>
+          <div class="quest-foot">
+            <span class="small">${escapeHtml(progressText)}</span>
+            <span class="small">${escapeHtml(quest.hint)}</span>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderQuestChoicePanel(snapshot: Snapshot, selectedNpcId: string): string {
+  if (!selectedNpcId || snapshot.in_combat || snapshot.run_result) {
+    return "";
+  }
+
+  const offeredQuest = snapshot.quests.find((quest) => quest.status === "offered" && quest.offered_by_npc_id === selectedNpcId);
+  if (!offeredQuest) {
+    return "";
+  }
+
+  return `
+    <div class="quest-choice-card">
+      <div class="quest-choice-copy">
+        <span class="quest-status quest-status-offered">Quest offer</span>
+        <strong>${escapeHtml(offeredQuest.title)}</strong>
+        <p>${renderChatText(offeredQuest.summary)}</p>
+        <p class="quest-objective">${renderChatText(offeredQuest.objective_text)}</p>
+      </div>
+      <div class="quest-choice-actions">
+        <button type="button" data-quest-action="accept" data-quest-id="${offeredQuest.id}">Accept</button>
+        <button type="button" data-quest-action="decline" data-quest-id="${offeredQuest.id}">Decline</button>
+      </div>
+    </div>
+  `;
 }
 
 function renderNpcList(snapshot: Snapshot, selectedNpcId: string): string {
@@ -269,6 +436,22 @@ function renderNpcList(snapshot: Snapshot, selectedNpcId: string): string {
   `;
 }
 
+function renderUnifiedTranscript(snapshot: Snapshot | null, state: AppState): string {
+  if (snapshot?.in_combat && snapshot.combat_state) {
+    return renderCombatDispatch(snapshot);
+  }
+
+  if (!state.selectedNpcId) {
+    return renderChatEmpty(
+      snapshot
+        ? "No active conversation. Choose a nearby contact to start chatting."
+        : "No active channel. Begin a run and choose a nearby contact.",
+    );
+  }
+
+  return renderDialogueTranscript(snapshot, state);
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -277,14 +460,11 @@ function escapeHtml(value: string): string {
 }
 
 function renderDialogueTranscript(snapshot: Snapshot, state: AppState): string {
-  if (!state.selectedNpcId) {
-    return renderChatEmpty("Select a nearby contact to open a channel.");
-  }
-
   const thread = [...(state.dialogueThreads[state.selectedNpcId] ?? [])];
   if (thread.length === 0 && snapshot.dialogue?.npc_id === state.selectedNpcId) {
     thread.push({
       id: "snapshot-dialogue",
+      sequence: -1,
       speaker: "npc",
       npcId: snapshot.dialogue.npc_id,
       npcName: snapshot.dialogue.npc_name,
@@ -300,32 +480,127 @@ function renderDialogueTranscript(snapshot: Snapshot, state: AppState): string {
   return thread.map(renderChatMessage).join("");
 }
 
-function renderCombatTranscript(snapshot: Snapshot): string {
+function renderCombatDispatch(snapshot: Snapshot): string {
   const combatState = snapshot.combat_state;
   if (!combatState) {
     return renderChatEmpty("Combat telemetry unavailable.");
   }
 
-  const entries: DialogueMessage[] = [];
-  if ((combatState.enemy_ascii_art ?? []).length > 0) {
-    entries.push({
-      id: "combat-enemy-art",
-      speaker: "npc",
-      npcName: combatState.enemy_name,
-      text: combatState.enemy_ascii_art?.join("\n") ?? "",
+  const entries: DialogueMessage[] = combatState.events.map((event, index) => ({
+    id: event.id,
+    sequence: index,
+    speaker: event.actor === "player" ? "player" : event.actor === "enemy" ? "npc" : "system",
+    npcName: combatState.enemy.name,
+    text: event.text,
+  }));
+
+  if (entries.length === 0) {
+    combatState.log.forEach((line, index) => {
+      entries.push({
+        id: `combat-log-${index}`,
+        sequence: entries.length,
+        speaker: index === 0 ? "npc" : "system",
+        npcName: combatState.enemy.name,
+        text: line,
+      });
     });
   }
 
-  combatState.log.forEach((line, index) => {
-    entries.push({
-      id: `combat-log-${index}`,
-      speaker: index === 0 ? "npc" : "system",
-      npcName: combatState.enemy_name,
-      text: line,
-    });
-  });
-
   return entries.map(renderChatMessage).join("");
+}
+
+function renderCombatOverlay(snapshot: Snapshot): string {
+  const combatState = snapshot.combat_state;
+  if (!combatState) {
+    return "";
+  }
+
+  const asciiArt = combatState.enemy.presentation.ascii_art;
+  const enemyArt = asciiArt.length > 0
+    ? `<pre class="combat-overlay-art" aria-hidden="true">${escapeHtml(asciiArt.join("\n"))}</pre>`
+    : `<div class="combat-overlay-sigil" aria-hidden="true">${escapeHtml(combatState.enemy.name.slice(0, 1).toUpperCase())}</div>`;
+
+  return `
+    <div class="combat-overlay-shell">
+      <div class="combat-overlay-header">
+        <div>
+          <p class="eyebrow">Combat state</p>
+          <h3>${escapeHtml(combatState.enemy.name)}</h3>
+        </div>
+        <div class="combat-overlay-readout">
+          <span class="combat-stat-pill">Round ${combatState.round}</span>
+          <span class="combat-stat-pill is-danger">${combatState.enemy.hp}/${combatState.enemy.max_hp} HP</span>
+        </div>
+      </div>
+      <div class="combat-overlay-stage">
+        <div class="combat-overlay-enemy-card">
+          <div class="combat-overlay-enemy-copy">
+            <span class="combat-enemy-label">Hostile contact</span>
+            <strong>${escapeHtml(combatState.enemy.name)}</strong>
+            <div class="combat-enemy-stats">
+              <span>ATK ${combatState.enemy.attack}</span>
+              <span>DEF ${combatState.enemy.defence}</span>
+            </div>
+          </div>
+          ${enemyArt}
+        </div>
+      </div>
+      <div class="combat-overlay-hud">
+        <div class="combat-overlay-hud-head">
+          <span class="combat-enemy-label">Party line</span>
+          <span class="small">Reserved slots stay visible so party members can drop in later.</span>
+        </div>
+        <div class="combat-party-grid">
+          ${combatState.party.map((slot) => renderCombatPartyCard(slot)).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderCombatPartyCard(slot: CombatPartySlot): string {
+  const hpMax = slot.reserve ? 1 : Math.max(slot.max_hp, 1);
+  const hpValue = slot.reserve ? 0 : slot.hp;
+  const meterWidth = Math.max(0, Math.min(100, (hpValue / hpMax) * 100));
+  const hpText = slot.reserve ? "Reserve" : `${slot.hp}/${slot.max_hp} HP`;
+  return `
+    <article class="combat-party-card${slot.is_player ? " is-player" : ""}${slot.reserve ? " is-reserve" : ""}">
+      <div class="combat-party-card-head">
+        <div>
+          <span class="combat-enemy-label">${escapeHtml(slot.role)}</span>
+          <strong>${escapeHtml(slot.name)}</strong>
+        </div>
+        <span class="combat-party-stat">ATK ${slot.attack}</span>
+      </div>
+      <div class="combat-party-meter">
+        <div class="combat-party-meter-bar"><span style="width:${meterWidth}%"></span></div>
+        <div class="combat-party-meter-copy">
+          <span>${escapeHtml(hpText)}</span>
+          <span>DEF ${slot.defence}</span>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderCombatActions(snapshot: Snapshot): string {
+  const combatState = snapshot.combat_state;
+  if (!combatState) {
+    return "";
+  }
+
+  return combatState.available_actions
+    .map((action) => `
+      <button
+        type="button"
+        class="combat-action-button combat-action-${action.kind}"
+        data-combat-action="${escapeHtml(action.id)}"
+        ${action.enabled ? "" : "disabled"}
+      >
+        ${escapeHtml(action.label)}
+      </button>
+    `)
+    .join("");
 }
 
 function renderChatEmpty(copy: string): string {
@@ -366,6 +641,10 @@ function renderJournalEmpty(copy: string): string {
   return `<div class="chat-empty">${escapeHtml(copy)}</div>`;
 }
 
+function renderQuestEmpty(copy: string): string {
+  return `<div class="chat-empty">${escapeHtml(copy)}</div>`;
+}
+
 function formatJournalStamp(value: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
@@ -386,19 +665,22 @@ function renderChatMessage(message: DialogueMessage): string {
     : message.speaker === "system"
       ? "System"
       : message.npcName ?? "Contact";
-  const sourceChip = message.speaker === "npc" && message.source
+  const sourceChip = message.speaker === "npc" && message.source && !message.streaming
     ? `<span class="chat-source">${escapeHtml(message.source)}</span>`
     : "";
-  const text = message.text.trim() || (message.streaming ? "..." : "");
+  const text = message.text.trim();
+  const content = message.streaming && !text
+    ? '<div class="chat-loading" aria-label="Response in progress"><span></span><span></span><span></span></div>'
+    : `<p>${renderChatText(text)}</p>`;
 
   return `
-    <div class="chat-message is-${message.speaker}">
+    <div class="chat-message is-${message.speaker}${message.streaming ? " is-streaming" : ""}">
       <div class="chat-bubble">
         <div class="chat-bubble-meta">
           <span class="chat-speaker">${escapeHtml(speakerLabel)}</span>
           ${sourceChip}
         </div>
-        <p>${renderChatText(text)}</p>
+        ${content}
       </div>
     </div>
   `;

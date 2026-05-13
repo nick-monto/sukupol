@@ -12,7 +12,7 @@ type ControllerOptions = {
 };
 
 const CHAT_DOCK_HEIGHT_KEY = "sukupol.chatDockHeight";
-const CHAT_DOCK_DEFAULT_HEIGHT = 400;
+const CHAT_DOCK_DEFAULT_HEIGHT = 520;
 const CHAT_DOCK_MIN_HEIGHT = 256;
 const CHAT_DOCK_MAX_HEIGHT_RATIO = 0.75;
 
@@ -23,7 +23,7 @@ export function bindInteractionHandlers(options: ControllerOptions): void {
 
   document.addEventListener("keydown", async (event) => {
     const { state } = options;
-    if (!state.runId || state.busy || state.snapshot?.in_combat || isEditableTarget(event.target)) {
+    if (!state.runId || state.busy || isCombatPresentationActive(state) || isEditableTarget(event.target)) {
       return;
     }
 
@@ -70,6 +70,7 @@ export function bindInteractionHandlers(options: ControllerOptions): void {
       state.selectedNpcId = "";
       state.dialogueThreads = {};
       state.viewportTransition = "none";
+      state.presentationLock = null;
       render();
     } catch (error) {
       renderError(error);
@@ -91,7 +92,7 @@ export function bindInteractionHandlers(options: ControllerOptions): void {
       const snapshot = await api<Snapshot>(apiBase, `/api/runs/${state.runId}/extract`, {
         method: "POST",
       });
-      state.viewportTransition = state.snapshot?.in_combat ? "combat-exit" : "none";
+      setViewportTransitionState(state, state.snapshot, snapshot, false);
       state.snapshot = snapshot;
       render();
     } catch (error) {
@@ -106,6 +107,26 @@ export function bindInteractionHandlers(options: ControllerOptions): void {
     await leaveNpcConversation(options);
   });
 
+  ui.questChoicePanel.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const button = target.closest<HTMLButtonElement>("button[data-quest-action][data-quest-id]");
+    if (!button) {
+      return;
+    }
+
+    const action = button.dataset.questAction;
+    const questId = button.dataset.questId;
+    if (!action || !questId) {
+      return;
+    }
+
+    await runQuestDecision(options, questId, action);
+  });
+
   document.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((button) => {
     button.addEventListener("click", async () => {
       const action = button.dataset.action;
@@ -117,8 +138,8 @@ export function bindInteractionHandlers(options: ControllerOptions): void {
   });
 
   ui.sendMessageButton.addEventListener("click", async () => {
-    const { state, apiBase, render, renderError } = options;
-    if (!state.runId || !state.selectedNpcId || state.busy || state.snapshot?.in_combat) {
+    const { state, render, renderError } = options;
+    if (!state.runId || !state.selectedNpcId || state.busy || isCombatPresentationActive(state)) {
       return;
     }
 
@@ -139,6 +160,7 @@ export function bindInteractionHandlers(options: ControllerOptions): void {
     try {
       await streamNpcDialogue(options, state.selectedNpcId, message);
       state.viewportTransition = "none";
+      state.presentationLock = null;
       render();
     } catch (error) {
       state.streamingDialogue = null;
@@ -149,32 +171,40 @@ export function bindInteractionHandlers(options: ControllerOptions): void {
     }
   });
 
-  ui.combatActions.querySelectorAll<HTMLButtonElement>("button[data-combat-action]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const action = button.dataset.combatAction;
-      const { state, apiBase, render, renderError } = options;
-      if (!action || !state.runId || state.busy) {
-        return;
-      }
+  ui.combatActions.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
 
-      state.busy = true;
+    const button = target.closest<HTMLButtonElement>("button[data-combat-action]");
+    if (!button) {
+      return;
+    }
+
+    const action = button.dataset.combatAction;
+    const { state, apiBase, render, renderError } = options;
+    if (!action || !state.runId || state.busy || button.disabled) {
+      return;
+    }
+
+    state.busy = true;
+    syncBusyState(ui, state);
+    try {
+      const previousSnapshot = state.snapshot;
+      const snapshot = await api<Snapshot>(apiBase, `/api/runs/${state.runId}/combat`, {
+        method: "POST",
+        body: JSON.stringify({ action }),
+      });
+      setViewportTransitionState(state, previousSnapshot, snapshot, true);
+      state.snapshot = snapshot;
+      render();
+    } catch (error) {
+      renderError(error);
+    } finally {
+      state.busy = false;
       syncBusyState(ui, state);
-      try {
-        const previousSnapshot = state.snapshot;
-        const snapshot = await api<Snapshot>(apiBase, `/api/runs/${state.runId}/combat`, {
-          method: "POST",
-          body: JSON.stringify({ action }),
-        });
-        state.viewportTransition = deriveViewportTransition(previousSnapshot, snapshot, action, true);
-        state.snapshot = snapshot;
-        render();
-      } catch (error) {
-        renderError(error);
-      } finally {
-        state.busy = false;
-        syncBusyState(ui, state);
-      }
-    });
+    }
   });
 }
 
@@ -290,15 +320,16 @@ async function streamNpcDialogue(options: ControllerOptions, npcId: string, mess
           render();
         } else if (event.type === "chunk") {
           if (state.streamingDialogue) {
+            const nextText = `${state.streamingDialogue.text}${event.text}`;
             state.streamingDialogue = {
               ...state.streamingDialogue,
-              text: `${state.streamingDialogue.text}${event.text}`,
+              text: nextText,
             };
             upsertStreamingNpcMessage(state, {
               npcId: state.streamingDialogue.npc_id,
               npcName: state.streamingDialogue.npc_name,
               source: state.streamingDialogue.source,
-              text: state.streamingDialogue.text,
+              text: nextText,
             });
             render();
           }
@@ -322,7 +353,13 @@ async function streamNpcDialogue(options: ControllerOptions, npcId: string, mess
 
   state.snapshot = finalSnapshot;
   if (finalSnapshot.dialogue) {
-    finalizeNpcMessage(state, finalSnapshot.dialogue.npc_id, finalSnapshot.dialogue.npc_name, finalSnapshot.dialogue.source, finalSnapshot.dialogue.text);
+    finalizeNpcMessage(
+      state,
+      finalSnapshot.dialogue.npc_id,
+      finalSnapshot.dialogue.npc_name,
+      finalSnapshot.dialogue.source,
+      finalSnapshot.dialogue.text,
+    );
   }
   state.streamingDialogue = null;
 }
@@ -349,10 +386,11 @@ export async function leaveNpcConversation(options: ControllerOptions, npcId?: s
   state.busy = true;
   syncBusyState(ui, state);
   try {
-    state.snapshot = await api<Snapshot>(apiBase, `/api/npcs/${targetNpcId}/leave`, {
+    const snapshot = await api<Snapshot>(apiBase, `/api/npcs/${targetNpcId}/leave`, {
       method: "POST",
       body: JSON.stringify({ run_id: state.runId }),
     });
+    state.snapshot = snapshot;
     if (state.selectedNpcId === targetNpcId) {
       state.selectedNpcId = "";
     }
@@ -366,32 +404,42 @@ export async function leaveNpcConversation(options: ControllerOptions, npcId?: s
 }
 
 export function syncBusyState(ui: UiElements, state: AppState): void {
+  const combatPresentationActive = isCombatPresentationActive(state);
+
   ui.startRunButton.disabled = false;
   ui.extractRunButton.disabled = !state.runId
-    || state.snapshot?.in_combat === true
+    || combatPresentationActive
     || state.snapshot?.location.id !== "town_square"
     || !!state.snapshot?.run_result;
   ui.sendMessageButton.disabled = state.busy
     || !state.selectedNpcId
     || !state.runId
-    || state.snapshot?.in_combat === true
+    || combatPresentationActive
     || !!state.snapshot?.run_result;
   ui.leaveConversationButton.disabled = state.busy
     || !state.selectedNpcId
     || !state.runId
-    || state.snapshot?.in_combat === true
+    || combatPresentationActive
     || !!state.snapshot?.run_result;
   ui.playerMessage.disabled = state.busy
     || !state.runId
-    || state.snapshot?.in_combat === true
+    || combatPresentationActive
     || !!state.snapshot?.run_result;
 
   document.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((button) => {
-    button.disabled = !state.runId || state.snapshot?.in_combat === true || !!state.snapshot?.run_result;
+    button.disabled = !state.runId || combatPresentationActive || !!state.snapshot?.run_result;
   });
 
   ui.combatActions.querySelectorAll<HTMLButtonElement>("button[data-combat-action]").forEach((button) => {
-    button.disabled = !state.runId || state.snapshot?.in_combat !== true || !!state.snapshot?.run_result;
+    const actionId = button.dataset.combatAction;
+    const actionEnabled = actionId
+      ? state.snapshot?.combat_state?.available_actions.find((action) => action.id === actionId)?.enabled ?? true
+      : true;
+    button.disabled = state.busy || !state.runId || state.snapshot?.in_combat !== true || !!state.snapshot?.run_result || !actionEnabled;
+  });
+
+  ui.questChoicePanel.querySelectorAll<HTMLButtonElement>("button[data-quest-action]").forEach((button) => {
+    button.disabled = !state.runId || state.busy || combatPresentationActive || !!state.snapshot?.run_result;
   });
 }
 
@@ -409,7 +457,7 @@ async function runAction(options: ControllerOptions, action: string): Promise<vo
       method: "POST",
       body: JSON.stringify({ action }),
     });
-    state.viewportTransition = deriveViewportTransition(previousSnapshot, snapshot, action, false);
+    setViewportTransitionState(state, previousSnapshot, snapshot, false);
     state.snapshot = snapshot;
     if (state.selectedNpcId && !snapshot.nearby_npcs.some((npc) => npc.id === state.selectedNpcId)) {
       state.selectedNpcId = "";
@@ -426,7 +474,6 @@ async function runAction(options: ControllerOptions, action: string): Promise<vo
 function deriveViewportTransition(
   previousSnapshot: Snapshot | null,
   nextSnapshot: Snapshot,
-  action: string,
   isCombatAction: boolean,
 ): ViewportTransition {
   if (nextSnapshot.in_combat && !previousSnapshot?.in_combat) {
@@ -441,36 +488,46 @@ function deriveViewportTransition(
     return "combat-impact";
   }
 
-  if (!previousSnapshot) {
-    return "none";
-  }
-
-  const moved = previousSnapshot.location.id !== nextSnapshot.location.id
-    || previousSnapshot.position.x !== nextSnapshot.position.x
-    || previousSnapshot.position.y !== nextSnapshot.position.y;
-
-  switch (action) {
-    case "move_north":
-      return "none";
-    case "move_south":
-      return "none";
-    case "move_west":
-      return "none";
-    case "move_east":
-      return "none";
-    case "forward":
-      return "none";
-    case "backward":
-      return "none";
-    default:
-      return "none";
-  }
+  return "none";
 }
 
-function appendThreadMessage(state: AppState, npcId: string, message: Omit<DialogueMessage, "id">): void {
+function setViewportTransitionState(
+  state: AppState,
+  previousSnapshot: Snapshot | null,
+  nextSnapshot: Snapshot,
+  isCombatAction: boolean,
+): void {
+  const transition = deriveViewportTransition(previousSnapshot, nextSnapshot, isCombatAction);
+  state.viewportTransition = transition;
+
+  if (transition === "combat-exit" && previousSnapshot?.combat_state) {
+    state.presentationToken += 1;
+    state.presentationLock = {
+      transition,
+      combatState: previousSnapshot.combat_state,
+      token: state.presentationToken,
+    };
+    return;
+  }
+
+  state.presentationLock = null;
+}
+
+function isCombatPresentationActive(state: AppState): boolean {
+  return state.snapshot?.in_combat === true || state.presentationLock?.transition === "combat-exit";
+}
+
+function nextSequence(state: AppState): number {
+  state.messageSequence += 1;
+  return state.messageSequence;
+}
+
+function appendThreadMessage(state: AppState, npcId: string, message: Omit<DialogueMessage, "id" | "sequence">): void {
   const thread = state.dialogueThreads[npcId] ?? [];
+  const sequence = nextSequence(state);
   thread.push({
-    id: `msg-${Date.now()}-${thread.length}`,
+    id: `msg-${sequence}`,
+    sequence,
     ...message,
   });
   state.dialogueThreads[npcId] = thread;
@@ -489,8 +546,10 @@ function upsertStreamingNpcMessage(
     return;
   }
 
+  const sequence = nextSequence(state);
   thread.push({
-    id: `msg-${Date.now()}-${thread.length}`,
+    id: `msg-${sequence}`,
+    sequence,
     speaker: "npc",
     npcId: message.npcId,
     npcName: message.npcName,
@@ -518,14 +577,43 @@ function finalizeNpcMessage(
     return;
   }
 
-  thread.push({
-    id: `msg-${Date.now()}-${thread.length}`,
+  appendThreadMessage(state, npcId, {
     speaker: "npc",
     npcId,
     npcName,
     source,
     text,
-    streaming: false,
   });
-  state.dialogueThreads[npcId] = thread;
+}
+
+async function runQuestDecision(options: ControllerOptions, questId: string, action: string): Promise<void> {
+  const { state, ui, apiBase, render, renderError } = options;
+  if (!state.runId || state.busy) {
+    return;
+  }
+
+  state.busy = true;
+  syncBusyState(ui, state);
+  try {
+    const snapshot = await api<Snapshot>(apiBase, `/api/quests/${questId}/${action}`, {
+      method: "POST",
+      body: JSON.stringify({ run_id: state.runId }),
+    });
+    state.snapshot = snapshot;
+    if (snapshot.dialogue) {
+      appendThreadMessage(state, snapshot.dialogue.npc_id, {
+        speaker: "npc",
+        npcId: snapshot.dialogue.npc_id,
+        npcName: snapshot.dialogue.npc_name,
+        source: snapshot.dialogue.source,
+        text: snapshot.dialogue.text,
+      });
+    }
+    render();
+  } catch (error) {
+    renderError(error);
+  } finally {
+    state.busy = false;
+    syncBusyState(ui, state);
+  }
 }

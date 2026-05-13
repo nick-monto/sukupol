@@ -5,6 +5,7 @@ export type MapCell = {
   y: number;
   glyph: string;
   tone: MapTone;
+  variant?: string;
 };
 
 export type MapMetadata = {
@@ -15,13 +16,76 @@ export type MapMetadata = {
   cells: MapCell[];
 };
 
-export type CombatState = {
-  enemy_id: string;
-  enemy_name: string;
-  enemy_ascii_art?: string[];
-  enemy_hp: number;
-  enemy_max_hp: number;
+export type OverworldMapNode = {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  discovered: boolean;
+};
+
+export type OverworldMapConnection = {
+  location_ids: [string, string];
+  discovered: boolean;
+};
+
+export type OverworldMap = {
+  current_location_id: string | null;
+  nodes: OverworldMapNode[];
+  connections: OverworldMapConnection[];
+};
+
+export type CombatPresentation = {
+  mode: "ascii";
+  ascii_art: string[];
+};
+
+export type CombatAction = {
+  id: string;
+  label: string;
+  kind: "attack" | "defend" | "item" | "flee";
+  enabled: boolean;
+  item_id?: string | null;
+};
+
+export type CombatEvent = {
+  id: string;
   round: number;
+  actor: "player" | "enemy" | "system";
+  text: string;
+  emphasis: "entry" | "impact" | "guard" | "item" | "system" | "warning";
+};
+
+export type CombatPartySlot = {
+  slot_id: string;
+  name: string;
+  role: string;
+  hp: number;
+  max_hp: number;
+  attack: number;
+  defence: number;
+  is_player: boolean;
+  is_active: boolean;
+  reserve: boolean;
+};
+
+export type CombatEnemy = {
+  id: string;
+  name: string;
+  hp: number;
+  max_hp: number;
+  attack: number;
+  defence: number;
+  presentation: CombatPresentation;
+};
+
+export type CombatState = {
+  status: "engaged";
+  round: number;
+  enemy: CombatEnemy;
+  party: CombatPartySlot[];
+  available_actions: CombatAction[];
+  events: CombatEvent[];
   log: string[];
 };
 
@@ -30,6 +94,12 @@ export type ViewportTransition =
   | "combat-enter"
   | "combat-impact"
   | "combat-exit";
+
+export type PresentationLock = {
+  transition: "combat-exit";
+  combatState: CombatState;
+  token: number;
+};
 
 export type Snapshot = {
   run_id: string;
@@ -56,6 +126,7 @@ export type Snapshot = {
   message: string;
   map_view: string[];
   map_metadata?: MapMetadata | null;
+  overworld_map?: OverworldMap | null;
   nearby_npcs: Array<{
     id: string;
     display_name: string;
@@ -67,6 +138,9 @@ export type Snapshot = {
     item_id: string;
     quantity: number;
     equipped?: boolean;
+    name: string;
+    item_type: string;
+    description: string;
   }>;
   equipped_weapon?: string | null;
   in_combat: boolean;
@@ -103,6 +177,33 @@ export type Snapshot = {
       created_at: string;
     }>;
   }>;
+  quests: Array<{
+    id: string;
+    title: string;
+    summary: string;
+    objective_text: string;
+    objective_kind: string;
+    status: string;
+    offered_by_npc_id: string;
+    offered_by_npc_name: string;
+    target_biome_id?: string | null;
+    target_biome_name?: string | null;
+    target_floor_number?: number | null;
+    target_count: number;
+    progress_value: number;
+    progress_target: number;
+    target_item_id: string;
+    target_item_name: string;
+    reward_gold: number;
+    completion_summary?: string | null;
+    can_turn_in: boolean;
+    hint: string;
+    offered_at?: string | null;
+    accepted_at?: string | null;
+    completed_at?: string | null;
+    declined_at?: string | null;
+    updated_at?: string | null;
+  }>;
   dialogue?: {
     npc_id: string;
     npc_name: string;
@@ -113,6 +214,7 @@ export type Snapshot = {
 
 export type DialogueMessage = {
   id: string;
+  sequence: number;
   speaker: "player" | "npc" | "system";
   text: string;
   npcId?: string;
@@ -133,6 +235,9 @@ export type AppState = {
     source: string;
     text: string;
   } | null;
+  messageSequence: number;
   viewportTransition: ViewportTransition;
+  presentationLock: PresentationLock | null;
+  presentationToken: number;
   busy: boolean;
 };

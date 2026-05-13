@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import random
-
-from ..content import DECORATIVE_FLOOR_GLYPHS
 from .models import FloorLayout, RectRoom
 from .validator import validate_floor
 
@@ -37,29 +35,42 @@ def derive_floor_seed(run_seed: int, floor_number: int, biome_id: str, attempt: 
     return run_seed + (floor_number * 10_003) + biome_hash + attempt * 97
 
 
-def apply_floor_dressing(
-    grid: list[list[str]],
-    randomizer: random.Random,
-    protected_tiles: set[tuple[int, int]],
-) -> None:
-    for y, row in enumerate(grid):
-        for x, glyph in enumerate(row):
-            if glyph != "." or (x, y) in protected_tiles:
-                continue
+def build_floor_name(biome: dict, floor_number: int, randomizer: random.Random) -> str:
+    prefixes = biome.get("floor_name_prefixes", [])
+    if not prefixes:
+        return f"{biome['name']} F{floor_number}"
+    return f"{biome['name']}: {randomizer.choice(prefixes)} F{floor_number}"
 
-            wall_neighbors = sum(
-                1
-                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
-                if grid[y + dy][x + dx] == "#"
-            )
-            roll = randomizer.random()
 
-            if wall_neighbors >= 2 and roll < 0.32:
-                grid[y][x] = ","
-            elif wall_neighbors == 1 and roll < 0.18:
-                grid[y][x] = ";"
-            elif wall_neighbors == 0 and roll < 0.08:
-                grid[y][x] = randomizer.choice(tuple(sorted(DECORATIVE_FLOOR_GLYPHS)))
+def build_floor_description(biome: dict, floor_number: int, randomizer: random.Random) -> str:
+    templates = biome.get("floor_description_templates", [])
+    if not templates:
+        return biome["description"]
+
+    features = biome.get("floor_description_features", [])
+    feature = randomizer.choice(features) if features else biome["description"].lower()
+    template = randomizer.choice(templates)
+    return template.format(
+        biome_name=biome["name"],
+        floor_number=floor_number,
+        feature=feature,
+    )
+
+
+def build_return_exit(biome: dict, entry_x: int, entry_y: int) -> dict:
+    return_exit = biome.get("return_exit", {})
+    return {
+        "x": entry_x,
+        "y": entry_y,
+        "target_location_id": return_exit.get("target_location_id", "dungeon_approach"),
+        "target_x": int(return_exit.get("target_x", 4)),
+        "target_y": int(return_exit.get("target_y", 5)),
+        "target_facing": return_exit.get("target_facing", "S"),
+        "message": return_exit.get(
+            "message",
+            biome.get("return_message", "You retrace your steps to the surface."),
+        ),
+    }
 
 
 def generate_floor(run_seed: int, biome: dict, floor_number: int) -> FloorLayout:
@@ -120,28 +131,17 @@ def _generate_candidate(floor_seed: int, biome: dict, floor_number: int) -> Floo
             tile_y = origin_y + dy
             if 0 <= tile_x < width and 0 <= tile_y < height:
                 protected_tiles.add((tile_x, tile_y))
-    apply_floor_dressing(grid, randomizer, protected_tiles)
-    grid[entry_y][entry_x] = "<"
+    grid[entry_y][entry_x] = "∪"
     grid[exit_y][exit_x] = "."
 
     ascii_map = ["".join(row) for row in grid]
     validation = validate_floor(ascii_map, entry=(entry_x, entry_y), exit_point=(exit_x, exit_y))
     location_id = f"dungeon:{floor_seed}:{floor_number}"
-    exits = [
-        {
-            "x": entry_x,
-            "y": entry_y,
-            "target_location_id": "dungeon_approach",
-            "target_x": 4,
-            "target_y": 5,
-            "target_facing": "S",
-            "message": biome["return_message"],
-        }
-    ]
+    exits = [build_return_exit(biome, entry_x=entry_x, entry_y=entry_y)]
     return FloorLayout(
         location_id=location_id,
-        name=f"{biome['name']} F{floor_number}",
-        description=biome["description"],
+        name=build_floor_name(biome, floor_number=floor_number, randomizer=randomizer),
+        description=build_floor_description(biome, floor_number=floor_number, randomizer=randomizer),
         biome_id=biome["id"],
         floor_number=floor_number,
         floor_seed=floor_seed,

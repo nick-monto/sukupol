@@ -8,6 +8,7 @@ type MapRenderOptions = {
   lines: string[];
   metadata: MapMetadata | null;
   transition: ViewportTransition;
+  onTransitionComplete?: () => void;
 };
 
 let pixiViewportModule: PixiViewportModule | null = null;
@@ -35,6 +36,7 @@ export function renderMap(options: MapRenderOptions): void {
       renderMapWithPixi(latest, module);
     })
     .catch((error) => {
+      options.onTransitionComplete?.();
       reportPixiError(stage, error, "map module load failed");
     });
 }
@@ -63,8 +65,10 @@ function renderMapWithPixi(options: MapRenderOptions, module: PixiViewportModule
       metadata: options.metadata,
       transition: options.transition,
       styles: getComputedStyle(stage),
+      onTransitionComplete: options.onTransitionComplete,
     });
   } catch (error) {
+    options.onTransitionComplete?.();
     reportPixiError(stage, error, "map render failed");
   }
 }
@@ -112,7 +116,7 @@ function sanitizeMapLines(lines: string[]): string[] {
 }
 
 function sanitizeMapGlyph(glyph: string): string {
-  if (glyph === "." || glyph === "," || glyph === ";") {
+  if (glyph === ".") {
     return " ";
   }
 

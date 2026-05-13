@@ -15,18 +15,21 @@ Sukupol is a browser-based ASCII rogue-lite with map-based traversal, an overwor
 - Start a new run from the browser.
 - Render a primary traversal map returned by the backend.
 - Move with cardinal directions across towns, the overworld, caves, and dungeon floors.
-- Enter a deterministic, procedurally generated first dungeon floor that is persisted in SQLite per run.
+- Enter deterministic, procedurally generated first dungeon floors from multiple biome entrances, each persisted in SQLite per run.
 - Trigger random encounters while traveling through encounter-enabled areas.
 - Talk to nearby NPCs through a dialogue service abstraction with deterministic fallback responses.
+- Receive dungeon-linked fetch quests from NPC conversations, accept or decline them from the dialogue panel, and track recovery progress in the client. Each NPC now draws from a seeded pool of fetch variants rather than a single fixed errand, and offers bias toward the biome implied by the current conversation, nearby route context, and that NPC's own default concerns.
 - Persist run snapshots and dialogue summaries into SQLite.
 
 ## ASCII asset contract
 
-- Seeded maps currently support six glyphs: `#` wall, `.` floor, `>` forward descent or transition, `<` return or ascent, `,` loose rubble, and `;` moss or worn floor dressing.
-- The decorative floor glyphs are intentionally walkable. They enrich both map displays and static content without changing collision rules.
-- Any non-wall gameplay entity in seeded content must be placed on a walkable tile. The backend now validates player spawn points, NPC positions, exits, and map width consistency during content load.
+- Seeded maps support four gameplay glyphs: `#` wall, `.` floor, `∩` dungeon entrance or descent, and `∪` return or ascent.
+- Adjacent surface-zone transitions should read as gaps on the map edge, authored as walkable floor openings with matching exit nodes rather than standalone transition punctuation.
+- Player facing remains arrow-based (`^`, `>`, `v`, `<`), so seeded traversal glyphs should avoid those shapes to keep navigation legible.
+- Floor variety now comes from backend-owned map metadata and renderer underlays rather than extra walkable punctuation authored into the map itself.
+- Any non-wall gameplay entity in seeded content must be placed on a walkable tile. The backend validates player spawn points, NPC positions, exits, and map width consistency during content load.
 - NPC and enemy portraits remain free-form multi-line ASCII art, but the current content is authored as compact 4-line silhouettes to fit the existing sidebar and combat layouts cleanly.
-- Decorative glyph expansion should be treated as a renderer and simulation change, not a content-only edit, because map tone mapping and walkability are both explicit in code.
+- If a biome needs richer floor treatment, add structured metadata or renderer logic rather than inventing more walkable map glyphs.
 
 ## Map snapshot contract
 
@@ -62,6 +65,7 @@ The web client expects the API at `http://127.0.0.1:8000`. Override it with `VIT
 The current NPC dialogue implementation is intentionally conservative. The backend exposes a single dialogue service with a deterministic fallback mode and an environment-controlled seam for future Microsoft Agent Framework integration.
 
 - Default mode: deterministic stub responses grounded in NPC metadata and recent conversation summary.
+- NPC conversations can now surface backend-authored fetch quest offers tied to dungeon biomes, with explicit accept and decline actions in the client.
 - Future mode: local model hosted next to the backend, with Agent Framework sessions and validated game tools.
 
 Set `SUKUPOL_DIALOGUE_MODE=agent-framework` when that path is implemented and wired to a local provider.
@@ -100,11 +104,3 @@ Quick smoke test for the LLM server:
 ```bash
 curl http://127.0.0.1:8033/v1/models
 ```
-
-## Next implementation targets
-
-1. Replace the fallback dialogue path with Agent Framework plus a local chat client.
-2. Expand seeded content, encounter tables, and biome variety across the overworld and site network.
-3. Move from seeded snapshots to richer run persistence and meta-progression.
-4. Continue cleaning up map-era naming and presentation layers in the client.
-

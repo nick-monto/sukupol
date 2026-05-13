@@ -10,9 +10,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 CONTENT_PATH = REPO_ROOT / "packages" / "content" / "world" / "bootstrap.json"
 SCHEMA_DIR = REPO_ROOT / "packages" / "schema" / "sql"
 DEFAULT_DB_PATH = REPO_ROOT / "services" / "game-api" / "data" / "sukupol.db"
-DECORATIVE_FLOOR_GLYPHS = frozenset({",", ";"})
-SUPPORTED_MAP_GLYPHS = frozenset({"#", ".", ">", "<", *DECORATIVE_FLOOR_GLYPHS})
-WALKABLE_MAP_GLYPHS = frozenset({".", ">", "<", *DECORATIVE_FLOOR_GLYPHS})
+SUPPORTED_MAP_GLYPHS = frozenset({"#", ".", "∪", "∩"})
+WALKABLE_MAP_GLYPHS = frozenset({".", "<", "∪", "∩"})
 
 
 @dataclass(frozen=True)
@@ -52,10 +51,13 @@ def validate_world_content(raw: dict[str, Any]) -> None:
     locations = raw.get("locations", [])
     location_by_id = {location["id"]: location for location in locations}
     biome_by_id = {biome["id"]: biome for biome in raw.get("dungeon_biomes", [])}
+    item_by_id = {item["id"]: item for item in raw.get("items", [])}
     enemy_by_id = {enemy["id"]: enemy for enemy in raw.get("enemies", [])}
+    overworld_positions: set[tuple[int, int]] = set()
 
     for location in locations:
         rows = validate_ascii_map(location)
+        validate_overworld_map(location, overworld_positions)
         for exit_node in location.get("exits", []):
             label = f"location {location['id']} exit at ({exit_node['x']}, {exit_node['y']})"
             validate_walkable_position(rows, exit_node["x"], exit_node["y"], label)
@@ -79,8 +81,12 @@ def validate_world_content(raw: dict[str, Any]) -> None:
             f"npc {npc['id']} in {npc['location_id']}",
         )
 
+    for biome in raw.get("dungeon_biomes", []):
+        validate_procgen_biome(biome, location_by_id)
+
     for enemy in raw.get("enemies", []):
         validate_ascii_art(enemy.get("ascii_art", []), f"enemy {enemy['id']}")
+        validate_enemy(enemy, item_by_id)
 
     for encounter in raw.get("encounters", []):
         validate_encounter(encounter, biome_by_id, enemy_by_id)
@@ -108,6 +114,67 @@ def validate_ascii_map(location: dict[str, Any]) -> list[str]:
 def validate_ascii_art(lines: list[str], label: str) -> None:
     if not isinstance(lines, list) or not lines or not all(isinstance(line, str) and line for line in lines):
         raise ValueError(f"{label} must define a non-empty ascii_art list of strings")
+
+
+def validate_enemy(enemy: dict[str, Any], items: dict[str, dict[str, Any]]) -> None:
+    for loot_entry in enemy.get("loot_table", []):
+        item_id = loot_entry.get("item_id")
+        if item_id not in items:
+            raise ValueError(f"Enemy {enemy.get('id', '<unknown>')} references unknown loot item {item_id}")
+
+
+def validate_procgen_biome(
+    biome: dict[str, Any],
+    locations: dict[str, dict[str, Any]],
+) -> None:
+    for field_name in ("floor_name_prefixes", "floor_description_templates", "floor_description_features"):
+        field_value = biome.get(field_name)
+        if field_value is None:
+            continue
+        if not isinstance(field_value, list) or not field_value or not all(isinstance(entry, str) and entry for entry in field_value):
+            raise ValueError(f"Biome {biome.get('id', '<unknown>')} must define {field_name} as a non-empty list of strings")
+
+    return_exit = biome.get("return_exit")
+    if return_exit is None:
+        return
+
+    if not isinstance(return_exit, dict):
+        raise ValueError(f"Biome {biome.get('id', '<unknown>')} return_exit must be an object")
+
+    target_location = require_location(
+        locations,
+        return_exit["target_location_id"],
+        f"biome {biome.get('id', '<unknown>')} return_exit",
+    )
+    validate_walkable_position(
+        target_location["ascii_map"],
+        int(return_exit["target_x"]),
+        int(return_exit["target_y"]),
+        f"biome {biome.get('id', '<unknown>')} return_exit",
+    )
+
+    if not isinstance(return_exit.get("message"), str) or not return_exit["message"]:
+        raise ValueError(f"Biome {biome.get('id', '<unknown>')} return_exit must define a non-empty message")
+
+
+def validate_overworld_map(location: dict[str, Any], used_positions: set[tuple[int, int]]) -> None:
+    overworld_map = location.get("overworld_map")
+    if overworld_map is None:
+        return
+
+    if not isinstance(overworld_map, dict):
+        raise ValueError(f"Location {location['id']} overworld_map must be an object")
+
+    x = overworld_map.get("x")
+    y = overworld_map.get("y")
+    if not isinstance(x, int) or not isinstance(y, int):
+        raise ValueError(f"Location {location['id']} overworld_map must define integer x and y coordinates")
+
+    position = (x, y)
+    if position in used_positions:
+        raise ValueError(f"Location {location['id']} reuses overworld map position {position}")
+
+    used_positions.add(position)
 
 
 def validate_walkable_position(rows: list[str], x: int, y: int, label: str) -> None:

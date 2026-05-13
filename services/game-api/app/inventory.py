@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from typing import Any
+from typing import TYPE_CHECKING
 
 from .content import WorldContent
-from .game import RunState
+
+if TYPE_CHECKING:
+    from .game import RunState
 
 
 def get_inventory_entry(state: RunState, item_id: str) -> dict[str, Any] | None:
@@ -22,6 +25,17 @@ def add_item(state: RunState, world: WorldContent, item_id: str, quantity: int =
     else:
         inventory.append({"item_id": item_id, "quantity": quantity, "equipped": False})
     state.inventory = inventory
+
+
+def remove_item(state: RunState, item_id: str, quantity: int = 1) -> bool:
+    entry = get_inventory_entry(state, item_id)
+    if entry is None or int(entry.get("quantity", 0)) < quantity:
+        return False
+
+    entry["quantity"] -= quantity
+    if entry["quantity"] <= 0:
+        state.inventory = [inventory_item for inventory_item in state.inventory or [] if inventory_item["item_id"] != item_id]
+    return True
 
 
 def use_item(state: RunState, world: WorldContent, item_id: str) -> tuple[bool, str]:

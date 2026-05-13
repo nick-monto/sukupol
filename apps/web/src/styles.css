@@ -176,7 +176,7 @@ button:focus-visible {
 }
 
 #app {
-  width: min(1280px, calc(100vw - 2rem));
+  width: min(1560px, calc(100vw - 1.5rem));
   margin: 0 auto;
   padding: 1.25rem 0 2.25rem;
 }
@@ -316,11 +316,10 @@ button:focus-visible {
 
 .hero-summary,
 .inventory-list,
+.quest-list,
 .npc-list,
 .dialogue-form,
-.panel-subsection,
-.hud,
-.viewport-support {
+.panel-subsection {
   display: grid;
   gap: 0.75rem;
 }
@@ -337,6 +336,29 @@ button:focus-visible {
 .stage-shell {
   display: grid;
   gap: 1rem;
+}
+
+.stage-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(24rem, 0.9fr);
+  gap: 1.1rem;
+  align-items: start;
+}
+
+.stage-main,
+.stage-comms {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.stage-main {
+  grid-template-rows: auto auto auto;
+}
+
+.stage-comms {
+  position: sticky;
+  top: 1rem;
 }
 
 .grid-secondary {
@@ -395,10 +417,25 @@ button:focus-visible {
   border-color: rgba(255, 255, 255, 0.08);
 }
 
+.viewport[data-mode="combat"] .viewport-frame {
+  min-height: 38rem;
+}
+
 .viewport-stage {
   position: relative;
   overflow: clip;
   background: #000;
+}
+
+.viewport[data-mode="combat"] .viewport-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, rgba(255, 142, 119, 0.06), transparent 38%),
+    linear-gradient(180deg, rgba(15, 4, 6, 0.18) 0%, rgba(20, 6, 7, 0.48) 100%);
 }
 
 .viewport-pixi-stage {
@@ -412,23 +449,260 @@ button:focus-visible {
   pointer-events: none;
 }
 
-.viewport-support {
-  margin-top: 0.9rem;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+.viewport[data-mode="combat"] .viewport-pixi-stage {
+  aspect-ratio: 27 / 18;
+  min-height: 33rem;
+}
+
+.viewport[data-mode="combat"] .viewport-pixi-stage canvas {
+  filter: blur(7px) saturate(0.82) brightness(0.66);
+  transform: scale(1.03);
+  transform-origin: center;
+}
+
+.combat-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  pointer-events: none;
+}
+
+.combat-overlay-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  padding: 0.75rem;
+  color: var(--viewport-combat-text);
+}
+
+.combat-overlay-header,
+.combat-overlay-readout,
+.combat-overlay-hud-head,
+.combat-party-card-head,
+.combat-party-meter-copy,
+.combat-enemy-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.combat-overlay-header {
   align-items: start;
+}
+
+.combat-overlay-header h3 {
+  margin: 0.2rem 0 0;
+  font-family: "Fraunces", serif;
+  font-size: clamp(1.15rem, 1.9vw, 1.6rem);
+}
+
+.combat-overlay-readout {
+  flex-wrap: wrap;
+  justify-content: end;
+}
+
+.combat-stat-pill,
+.combat-enemy-label,
+.combat-party-stat {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.66rem;
+}
+
+.combat-stat-pill {
+  color: #fff4dc;
+  background: rgba(255, 230, 191, 0.08);
+  border: 1px solid rgba(255, 219, 171, 0.18);
+}
+
+.combat-stat-pill.is-danger {
+  color: #ffe1d8;
+  background: rgba(190, 52, 36, 0.22);
+  border-color: rgba(255, 163, 135, 0.32);
+}
+
+.combat-enemy-label,
+.combat-party-stat {
+  color: rgba(255, 228, 216, 0.84);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.combat-overlay-stage {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 0.35rem 0 0.75rem;
+}
+
+.combat-overlay-enemy-card {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: center;
+  min-width: min(100%, 30rem);
+  padding: 0.95rem 1.2rem;
+  border-radius: 20px;
+  border: 1px solid var(--viewport-combat-border);
+  background:
+    radial-gradient(circle at top, var(--viewport-combat-halo), transparent 58%),
+    linear-gradient(180deg, rgba(22, 7, 8, 0.84) 0%, rgba(11, 3, 4, 0.9) 100%);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.32),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.combat-overlay-enemy-copy {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.combat-overlay-enemy-copy strong {
+  font-family: "Fraunces", serif;
+  font-size: clamp(1.35rem, 2.4vw, 2.1rem);
+}
+
+.combat-enemy-stats {
+  justify-content: center;
+  color: rgba(255, 228, 216, 0.86);
+  font-size: 0.82rem;
+}
+
+.combat-overlay-art,
+.combat-overlay-sigil {
+  min-width: 14ch;
+  min-height: 0;
+  margin: 0;
+  padding: 1rem 1.2rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 228, 216, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--viewport-combat-creature);
+  text-align: center;
+  text-shadow: 0 0 18px rgba(255, 183, 156, 0.22);
+}
+
+.combat-overlay-sigil {
+  display: grid;
+  place-items: center;
+  min-width: 5rem;
+  min-height: 5rem;
+  font-family: "Fraunces", serif;
+  font-size: 2.3rem;
+}
+
+.combat-overlay-hud {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.7rem 0.8rem 0.8rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 170, 146, 0.18);
+  background:
+    linear-gradient(180deg, rgba(28, 7, 8, 0.82) 0%, rgba(12, 4, 5, 0.92) 100%),
+    rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.combat-overlay-hud-head {
+  align-items: end;
+}
+
+.combat-party-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.combat-party-card {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.68rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.combat-party-card.is-player {
+  border-color: rgba(241, 216, 172, 0.24);
+  background: linear-gradient(180deg, rgba(214, 179, 116, 0.12), rgba(255, 255, 255, 0.04));
+}
+
+.combat-party-card.is-reserve {
+  border-style: dashed;
+  opacity: 0.76;
+}
+
+.combat-party-card strong {
+  display: block;
+  margin-top: 0.14rem;
+}
+
+.combat-party-meter {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.combat-party-meter-bar {
+  width: 100%;
+  height: 0.48rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.combat-party-meter-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(255, 177, 141, 0.88), rgba(255, 226, 180, 0.92));
+}
+
+.combat-party-meter-copy {
+  color: rgba(255, 228, 216, 0.78);
+  font-size: 0.7rem;
+}
+
+.support-stack {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stage-contacts-panel {
+  padding: 0.95rem 1rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(12, 17, 21, 0.96) 0%, rgba(9, 12, 16, 0.98) 100%);
+}
+
+.stage-contacts-panel > div:first-child {
+  display: grid;
+  gap: 0.2rem;
 }
 
 .viewport-chat {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 0.85rem;
-  height: 25rem;
+  height: min(72vh, 56rem);
   min-width: 0;
-  min-height: 16rem;
-  max-height: 70vh;
-  margin-top: -0.2rem;
-  padding: 0.9rem 0 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  min-height: 28rem;
+  max-height: none;
+  margin-top: 0;
+  padding: 0.95rem 1rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(11, 15, 19, 0.96) 0%, rgba(8, 11, 14, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .viewport-chat-resize-handle {
@@ -473,6 +747,11 @@ button:focus-visible {
   min-width: 0;
 }
 
+.viewport-chat-head {
+  grid-template-columns: minmax(0, 1.35fr) minmax(15rem, 0.65fr);
+  align-items: end;
+}
+
 .viewport-chat-intro,
 .viewport-chat-status {
   grid-template-columns: minmax(0, 1fr) auto;
@@ -502,10 +781,48 @@ button:focus-visible {
   min-height: 0;
   overflow-x: hidden;
   overflow: auto;
-  padding: 0.9rem;
-  border-radius: 14px;
+  padding: 1rem;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  background: linear-gradient(180deg, rgba(8, 12, 15, 0.92) 0%, rgba(10, 15, 18, 0.98) 100%);
+  background:
+    radial-gradient(circle at top, rgba(214, 179, 116, 0.06), transparent 34%),
+    linear-gradient(180deg, rgba(8, 12, 15, 0.92) 0%, rgba(10, 15, 18, 0.98) 100%);
+}
+
+.viewport-chat[data-mode="combat"] {
+  gap: 0.7rem;
+}
+
+.viewport-chat[data-mode="combat"] .viewport-chat-head {
+  grid-template-columns: 1fr;
+  gap: 0.55rem;
+  align-items: start;
+}
+
+.viewport-chat[data-mode="combat"] .viewport-chat-intro,
+.viewport-chat[data-mode="combat"] .viewport-chat-status {
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+.viewport-chat[data-mode="combat"] .viewport-chat-status {
+  gap: 0.2rem;
+}
+
+.viewport-chat[data-mode="combat"] .panel-note {
+  max-width: none;
+  text-align: left;
+}
+
+.viewport-chat[data-mode="combat"] .chat-transcript {
+  gap: 0.6rem;
+  padding: 0.8rem;
+}
+
+.viewport-chat[data-mode="combat"] .chat-channel-pill {
+  color: #ffe4d8;
+  border-color: rgba(255, 163, 135, 0.22);
+  background: rgba(216, 138, 121, 0.12);
 }
 
 .chat-empty {
@@ -514,6 +831,174 @@ button:focus-visible {
   color: var(--text-soft);
   background: rgba(255, 255, 255, 0.03);
   border: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.quest-list,
+.quest-choice-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.overworld-map,
+.overworld-map-card {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.overworld-map-card {
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(13, 18, 22, 0.94) 0%, rgba(10, 14, 17, 0.94) 100%);
+}
+
+.overworld-map-note {
+  margin: 0;
+  color: var(--text-soft);
+}
+
+.overworld-map-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.overworld-map-link {
+  stroke: rgba(125, 137, 136, 0.18);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 10 12;
+}
+
+.overworld-map-link.is-discovered {
+  stroke: rgba(214, 179, 116, 0.72);
+  stroke-dasharray: none;
+}
+
+.overworld-map-node {
+  opacity: 0.56;
+}
+
+.overworld-map-node.is-discovered {
+  opacity: 1;
+}
+
+.overworld-map-node-ring {
+  fill: rgba(255, 255, 255, 0.02);
+  stroke: rgba(125, 137, 136, 0.25);
+  stroke-width: 2;
+}
+
+.overworld-map-node-core {
+  fill: rgba(125, 137, 136, 0.34);
+  stroke: rgba(255, 255, 255, 0.05);
+  stroke-width: 1.5;
+}
+
+.overworld-map-node.is-discovered .overworld-map-node-ring {
+  stroke: rgba(214, 179, 116, 0.44);
+  fill: rgba(214, 179, 116, 0.08);
+}
+
+.overworld-map-node.is-discovered .overworld-map-node-core {
+  fill: rgba(214, 179, 116, 0.9);
+}
+
+.overworld-map-node.is-current .overworld-map-node-ring {
+  stroke: rgba(140, 195, 179, 0.82);
+  stroke-width: 3;
+  fill: rgba(140, 195, 179, 0.12);
+}
+
+.overworld-map-node.is-current .overworld-map-node-core {
+  fill: rgba(140, 195, 179, 0.96);
+}
+
+.overworld-map-node-label {
+  fill: var(--text-dim);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+.overworld-map-node:not(.is-discovered) .overworld-map-node-label {
+  fill: rgba(125, 137, 136, 0.72);
+  font-style: italic;
+}
+
+.quest-card,
+.quest-choice-card {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(13, 18, 22, 0.94) 0%, rgba(10, 14, 17, 0.94) 100%);
+}
+
+.quest-card.is-offered,
+.quest-choice-card {
+  border-color: rgba(214, 179, 116, 0.28);
+}
+
+.quest-card.is-completed {
+  border-color: rgba(140, 195, 179, 0.26);
+}
+
+.quest-card-head,
+.quest-foot,
+.quest-choice-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.quest-choice-actions {
+  justify-content: flex-start;
+}
+
+.quest-status {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.quest-status-offered {
+  color: var(--accent-strong);
+  background: rgba(214, 179, 116, 0.14);
+  border: 1px solid rgba(214, 179, 116, 0.24);
+}
+
+.quest-status-active {
+  color: #d7f2eb;
+  background: rgba(140, 195, 179, 0.14);
+  border: 1px solid rgba(140, 195, 179, 0.24);
+}
+
+.quest-status-completed {
+  color: #d7f2eb;
+  background: rgba(94, 159, 131, 0.14);
+  border: 1px solid rgba(94, 159, 131, 0.26);
+}
+
+.quest-status-declined {
+  color: var(--text-soft);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.quest-summary,
+.quest-objective {
+  margin: 0;
+}
+
+.quest-objective {
+  color: var(--text);
 }
 
 .chat-message {
@@ -535,21 +1020,35 @@ button:focus-visible {
   gap: 0.45rem;
   width: 100%;
   min-width: 0;
-  max-width: min(40rem, 75%);
-  padding: 0.8rem 0.9rem;
-  border-radius: 14px;
+  max-width: min(48rem, 82%);
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.04);
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
+.viewport-chat[data-mode="combat"] .chat-bubble {
+  max-width: 100%;
+  padding: 0.8rem 0.9rem;
+}
+
+.viewport-chat[data-mode="combat"] .chat-bubble-meta {
+  gap: 0.45rem;
+}
+
+.viewport-chat[data-mode="combat"] .chat-speaker,
+.viewport-chat[data-mode="combat"] .chat-source {
+  font-size: 0.62rem;
+}
+
 .chat-message.is-npc .chat-bubble {
-  max-width: 75%;
+  max-width: min(50rem, 84%);
 }
 
 .chat-message.is-player .chat-bubble {
-  max-width: min(32rem, 68%);
+  max-width: min(38rem, 72%);
   background: linear-gradient(180deg, rgba(214, 179, 116, 0.16), rgba(214, 179, 116, 0.08));
   border-color: rgba(214, 179, 116, 0.24);
 }
@@ -588,8 +1087,36 @@ button:focus-visible {
   line-height: 1.6;
 }
 
+.chat-message.is-streaming .chat-bubble {
+  border-color: rgba(152, 183, 174, 0.24);
+  background: linear-gradient(180deg, rgba(152, 183, 174, 0.12), rgba(255, 255, 255, 0.03));
+}
+
+.chat-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-height: 1.25rem;
+}
+
+.chat-loading span {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 999px;
+  background: rgba(214, 179, 116, 0.9);
+  animation: chat-loading-pulse 900ms ease-in-out infinite;
+}
+
+.chat-loading span:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.chat-loading span:nth-child(3) {
+  animation-delay: 240ms;
+}
+
 .viewport-chat-compose {
-  padding-top: 0.1rem;
+  padding-top: 0.2rem;
   min-width: 0;
 }
 
@@ -606,7 +1133,7 @@ button:focus-visible {
 }
 
 .chat-composer-row textarea {
-  min-height: 4.4rem;
+  min-height: 5.25rem;
 }
 
 .chat-composer-actions button {
@@ -614,7 +1141,7 @@ button:focus-visible {
 }
 
 #send-message {
-  min-height: 4.4rem;
+  min-height: 5.25rem;
 }
 
 #leave-conversation {
@@ -703,26 +1230,6 @@ pre {
   font-size: 1.02rem;
 }
 
-.message-strip {
-  display: grid;
-  gap: 0.35rem;
-  padding: 0.85rem 0.95rem;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  transition: border-color 220ms ease, background 220ms ease;
-}
-
-.message-strip[data-mode="combat"] {
-  border-color: rgba(216, 138, 121, 0.28);
-  background: rgba(216, 138, 121, 0.08);
-}
-
-.message-strip[data-mode="archived"] {
-  border-color: rgba(167, 176, 182, 0.24);
-  background: rgba(167, 176, 182, 0.08);
-}
-
 .message-label,
 .inventory-mark {
   display: inline-flex;
@@ -754,9 +1261,8 @@ pre {
   min-height: 3rem;
 }
 
-.hud {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  align-items: start;
+.viewport-controls {
+  margin-top: 0.25rem;
 }
 
 .npc-item,
@@ -852,6 +1358,25 @@ pre {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.combat-action-button.combat-action-attack {
+  background: linear-gradient(180deg, rgba(214, 179, 116, 0.16), rgba(214, 179, 116, 0.08));
+}
+
+.combat-action-button.combat-action-defend {
+  background: linear-gradient(180deg, rgba(152, 183, 174, 0.16), rgba(152, 183, 174, 0.06));
+  border-color: rgba(152, 183, 174, 0.24);
+}
+
+.combat-action-button.combat-action-item {
+  background: linear-gradient(180deg, rgba(102, 152, 214, 0.18), rgba(102, 152, 214, 0.08));
+  border-color: rgba(102, 152, 214, 0.26);
+}
+
+.combat-action-button.combat-action-flee {
+  background: linear-gradient(180deg, rgba(216, 138, 121, 0.18), rgba(216, 138, 121, 0.08));
+  border-color: rgba(216, 138, 121, 0.28);
+}
+
 .action-panel[data-mode="combat"] .combat-actions {
   display: grid;
 }
@@ -921,10 +1446,6 @@ pre {
   animation: panel-mode-pulse 360ms ease;
 }
 
-.message-strip[data-transition="mode-change"] {
-  animation: strip-mode-pulse 320ms ease;
-}
-
 .npc-item.is-selected {
   animation: selected-contact-settle 220ms ease;
 }
@@ -955,16 +1476,16 @@ pre {
   }
 }
 
-@keyframes strip-mode-pulse {
-  0% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.82;
-  }
-
+@keyframes chat-loading-pulse {
+  0%,
+  80%,
   100% {
+    transform: scale(0.72);
+    opacity: 0.45;
+  }
+
+  40% {
+    transform: scale(1);
     opacity: 1;
   }
 }
@@ -983,10 +1504,17 @@ pre {
 
 @media (max-width: 1080px) {
   .hero-band,
-  .grid-secondary,
-  .hud,
-  .viewport-support {
+  .grid-secondary {
     grid-template-columns: 1fr;
+  }
+
+  .stage-layout,
+  .support-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-comms {
+    position: static;
   }
 
   .hero-summary {
@@ -1010,14 +1538,30 @@ pre {
     grid-template-columns: 1fr;
   }
 
+  .viewport-chat-head {
+    grid-template-columns: 1fr;
+  }
+
   .viewport-chat {
-    height: 22rem;
+    height: 28rem;
     max-height: none;
   }
 
   .chat-message.is-npc .chat-bubble,
   .chat-message.is-player .chat-bubble {
     max-width: 100%;
+  }
+
+  .combat-party-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .viewport[data-mode="combat"] .viewport-frame {
+    min-height: 34rem;
+  }
+
+  .viewport[data-mode="combat"] .viewport-pixi-stage {
+    min-height: 29rem;
   }
 }
 
@@ -1051,12 +1595,53 @@ pre {
     grid-template-columns: 1fr;
   }
 
+  .stage-layout {
+    gap: 0.85rem;
+  }
+
   .viewport-frame {
     min-height: auto;
   }
 
   .viewport-pixi-stage {
     min-height: 14rem;
+  }
+
+  .viewport[data-mode="combat"] .viewport-frame {
+    min-height: 29rem;
+  }
+
+  .viewport[data-mode="combat"] .viewport-pixi-stage {
+    aspect-ratio: 4 / 5;
+    min-height: 25rem;
+  }
+
+  .combat-overlay-shell {
+    padding: 0.7rem;
+  }
+
+  .combat-overlay-header,
+  .combat-overlay-readout,
+  .combat-overlay-hud-head,
+  .combat-party-card-head,
+  .combat-party-meter-copy {
+    display: grid;
+    justify-content: stretch;
+  }
+
+  .combat-overlay-enemy-card {
+    min-width: 100%;
+    padding: 0.9rem 1rem;
+  }
+
+  .viewport-chat {
+    height: 24rem;
+    min-height: 18rem;
+    padding-inline: 0.85rem;
+  }
+
+  .stage-contacts-panel {
+    padding-inline: 0.85rem;
   }
 
   .entity-ascii {

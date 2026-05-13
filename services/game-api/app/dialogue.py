@@ -20,6 +20,7 @@ from .db import (
     upsert_npc_shared_knowledge,
 )
 from .game import RunState, nearby_npcs, resolve_location
+from .quests import maybe_complete_quest_turn_in, maybe_offer_conversation_quest
 
 
 logger = logging.getLogger(__name__)
@@ -242,35 +243,46 @@ class NpcDialogueService:
         player_memory = load_npc_player_memory(state.player_id, npc_id)
         shared_knowledge = list_npc_shared_knowledge(npc_id)
 
-        if self.mode in {"agent-framework", "local-llm"}:
-            try:
-                if self.mode == "agent-framework":
-                    model_result = self._agent_framework_response(
-                        world=world,
-                        npc=npc,
-                        state=state,
-                        player_message=player_message,
-                        player_memory=player_memory,
-                        shared_knowledge=shared_knowledge,
-                    )
-                    source = "agent-framework"
-                else:
-                    model_result = self._local_llm_response(
-                        npc=npc,
-                        state=state,
-                        player_message=player_message,
-                        player_memory=player_memory,
-                        shared_knowledge=shared_knowledge,
-                    )
-                    source = "local-llm"
-                text = model_result.reply
-            except RuntimeError as error:
-                logger.exception("Dialogue provider failed in %s mode", self.mode)
-                text = self._fallback_response(npc, player_message, player_memory.get("summary", ""))
-                source = format_fallback_source(self.mode, error)
+        quest_completion = maybe_complete_quest_turn_in(world, state, npc_id)
+        if quest_completion is not None:
+            text = f"{npc['display_name']}: {quest_completion['response_text']}"
+            source = "quest"
         else:
-            text = self._fallback_response(npc, player_message, player_memory.get("summary", ""))
-            source = "stub"
+            if self.mode in {"agent-framework", "local-llm"}:
+                try:
+                    if self.mode == "agent-framework":
+                        model_result = self._agent_framework_response(
+                            world=world,
+                            npc=npc,
+                            state=state,
+                            player_message=player_message,
+                            player_memory=player_memory,
+                            shared_knowledge=shared_knowledge,
+                        )
+                        source = "agent-framework"
+                    else:
+                        model_result = self._local_llm_response(
+                            npc=npc,
+                            state=state,
+                            player_message=player_message,
+                            player_memory=player_memory,
+                            shared_knowledge=shared_knowledge,
+                        )
+                        source = "local-llm"
+                    text = model_result.reply
+                except RuntimeError as error:
+                    logger.exception("Dialogue provider failed in %s mode", self.mode)
+                    text = self._fallback_response(npc, player_message, player_memory.get("summary", ""))
+                    source = format_fallback_source(self.mode, error)
+            else:
+                text = self._fallback_response(npc, player_message, player_memory.get("summary", ""))
+                source = "stub"
+
+        if quest_completion is None:
+            quest_offer = maybe_offer_conversation_quest(world, state, npc, player_message)
+            if quest_offer is not None:
+                separator = "\n\n" if text.strip() else ""
+                text = f"{text.rstrip()}{separator}{npc['display_name']}: {quest_offer['offer_text']}"
 
         summary, lore_updates = self._summarize_exchange(
             npc=npc,
@@ -310,6 +322,8 @@ class NpcDialogueService:
         user_prompt = build_stream_dialogue_user_prompt(state, player_message, player_memory, shared_knowledge)
         source = self.mode if self.mode in {"agent-framework", "local-llm"} else "stub"
 
+        quest_completion = maybe_complete_quest_turn_in(world, state, npc_id)
+
         yield {
             "type": "start",
             "npc_id": npc_id,
@@ -317,28 +331,40 @@ class NpcDialogueService:
             "source": source,
         }
 
-        chunks: list[str] = []
-        if self.mode == "stub":
+        emitted_chunks: list[str] = []
+        if quest_completion is not None:
+            completion_text = f"{npc['display_name']}: {quest_completion['response_text']}"
+            async for chunk in synthesize_stream_chunks(completion_text):
+                emitted_chunks.append(chunk)
+                yield {"type": "chunk", "text": chunk}
+            source = "quest"
+        elif self.mode == "stub":
             fallback_text = self._fallback_response(npc, player_message, player_memory.get("summary", ""))
             async for chunk in synthesize_stream_chunks(fallback_text):
-                chunks.append(chunk)
+                emitted_chunks.append(chunk)
                 yield {"type": "chunk", "text": chunk}
 
         try:
             if self.mode == "agent-framework":
                 tools = build_npc_agent_tools(world, state, npc, player_memory, shared_knowledge)
+                provider_chunks: list[str] = []
                 async for chunk in self.agent_framework_client.astream_text(
                     agent_name=f"npc-{npc['id']}",
                     instructions=instructions,
                     user_prompt=user_prompt,
                     tools=tools,
                 ):
-                    chunks.append(chunk)
+                    provider_chunks.append(chunk)
+                for chunk in provider_chunks:
+                    emitted_chunks.append(chunk)
                     yield {"type": "chunk", "text": chunk}
                 source = "agent-framework"
             elif self.mode == "local-llm":
+                provider_chunks = []
                 for chunk in self.client.stream_text(instructions, user_prompt):
-                    chunks.append(chunk)
+                    provider_chunks.append(chunk)
+                for chunk in provider_chunks:
+                    emitted_chunks.append(chunk)
                     yield {"type": "chunk", "text": chunk}
                 source = "local-llm"
             elif self.mode != "stub":
@@ -346,16 +372,24 @@ class NpcDialogueService:
         except RuntimeError as error:
             logger.exception("Dialogue stream provider failed in %s mode", self.mode)
             source = format_fallback_source(self.mode, error) if self.mode in {"agent-framework", "local-llm"} else "stub"
-            if not chunks:
+            if quest_completion is None and self.mode != "stub":
+                emitted_chunks = []
                 fallback_text = self._fallback_response(npc, player_message, player_memory.get("summary", ""))
                 async for chunk in synthesize_stream_chunks(fallback_text):
-                    chunks.append(chunk)
+                    emitted_chunks.append(chunk)
                     yield {"type": "chunk", "text": chunk}
 
-        text = "".join(chunks).strip()
+        text = "".join(emitted_chunks).strip()
         text = coerce_dialogue_reply_text(text)
         if not text:
             text = self._fallback_response(npc, player_message, player_memory.get("summary", ""))
+
+        if quest_completion is None:
+            quest_offer = maybe_offer_conversation_quest(world, state, npc, player_message)
+            if quest_offer is not None:
+                offer_chunk = f"\n\n{npc['display_name']}: {quest_offer['offer_text']}"
+                text = f"{text.rstrip()}{offer_chunk}"
+                yield {"type": "chunk", "text": offer_chunk}
 
         summary, lore_updates = await self._asummarize_exchange(
             npc=npc,

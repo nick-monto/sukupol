@@ -10,23 +10,27 @@
       "id": "town_square",
       "name": "Town Square",
       "description": "A wind-cut square of lanterns, shutters, and anxious travelers.",
+      "overworld_map": {
+        "x": 0,
+        "y": 0
+      },
       "location_type": "town",
       "encounter_enabled": false,
       "ascii_map": [
         "#########",
-        "#,.....,#",
-        "#.#,;.#.#",
-        "#,..;..,#",
-        "#...;...#",
-        "#,.....,#",
-        "#...>...#",
-        "#.#,;.#.#",
+        "#.......#",
+        "#.#...#.#",
+        "#.......#",
+        "#........",
+        "#.......#",
+        "#.......#",
+        "#.#...#.#",
         "#########"
       ],
       "exits": [
         {
-          "x": 4,
-          "y": 6,
+          "x": 8,
+          "y": 4,
           "target_location_id": "outer_fields",
           "target_x": 1,
           "target_y": 5,
@@ -39,6 +43,10 @@
       "id": "outer_fields",
       "name": "Outer Fields",
       "description": "A battered road crossing wet grass, collapsed walls, and the old approaches beyond Sukupol.",
+      "overworld_map": {
+        "x": 2,
+        "y": 0
+      },
       "location_type": "overworld",
       "encounter_enabled": true,
       "encounter_rate": 18,
@@ -46,38 +54,38 @@
       "encounter_floor": 0,
       "ascii_map": [
         "###############",
-        "#..,.....;....#",
-        "#.....,....,..#",
-        "#...###.###...#",
         "#.............#",
-        "#<..#..>..#..>#",
         "#.............#",
         "#...###.###...#",
-        "#..;....,.....#",
-        "#....,.....;..#",
-        "###############"
+        "#.............#",
+        "....#.....#....",
+        "#.............#",
+        "#...###.###...#",
+        "#.............#",
+        "#.............#",
+        "#######.#######"
       ],
       "exits": [
         {
-          "x": 1,
+          "x": 0,
           "y": 5,
           "target_location_id": "town_square",
-          "target_x": 4,
-          "target_y": 5,
-          "target_facing": "N",
+          "target_x": 7,
+          "target_y": 4,
+          "target_facing": "W",
           "message": "The town walls close around you and the watchfires steady your nerves."
         },
         {
           "x": 7,
-          "y": 5,
+          "y": 10,
           "target_location_id": "dungeon_approach",
           "target_x": 4,
-          "target_y": 6,
+          "target_y": 1,
           "target_facing": "N",
           "message": "You leave the road and descend toward the old dungeon approach."
         },
         {
-          "x": 13,
+          "x": 14,
           "y": 5,
           "target_location_id": "whispering_cave",
           "target_x": 1,
@@ -91,29 +99,33 @@
       "id": "dungeon_approach",
       "name": "Dungeon Approach",
       "description": "Broken steps descend through old stone and damp moss.",
+      "overworld_map": {
+        "x": 2,
+        "y": 2
+      },
       "location_type": "wilderness",
       "encounter_enabled": true,
       "encounter_rate": 22,
       "biome_id": "ashen_fields",
       "encounter_floor": 0,
       "ascii_map": [
-        "#########",
-        "#...<...#",
-        "#,;###;,#",
-        "#.;#,#;.#",
-        "#,..;..,#",
-        "##,.;,.##",
-        "#...>...#",
-        "#,..;..,#",
+        "####.####",
+        "#.......#",
+        "#...###.#",
+        "#..#.#..#",
+        "#.......#",
+        "##.....##",
+        "#...∩...#",
+        "#.......#",
         "#########"
       ],
       "exits": [
         {
           "x": 4,
-          "y": 1,
+          "y": 0,
           "target_location_id": "outer_fields",
           "target_x": 7,
-          "target_y": 5,
+          "target_y": 9,
           "target_facing": "S",
           "message": "The old steps lift you back into the exposed road across the fields."
         },
@@ -131,7 +143,11 @@
     {
       "id": "whispering_cave",
       "name": "Whispering Cave",
-      "description": "A low stone chamber where dripping mineral teeth catch every footstep and throw it back at you.",
+      "description": "A low stone chamber where dripping mineral teeth catch every footstep and throw it back at you, and a half-submerged stair sinks into darker stone.",
+      "overworld_map": {
+        "x": 4,
+        "y": 0
+      },
       "location_type": "cave",
       "encounter_enabled": true,
       "encounter_rate": 26,
@@ -139,24 +155,33 @@
       "encounter_floor": 0,
       "ascii_map": [
         "###########",
-        "#...;.....#",
+        "#.........#",
         "#.#####...#",
         "#.#...#...#",
-        "#<#.,.#...#",
+        "..#...#...#",
         "#.#...#...#",
         "#...###...#",
-        "#.....;...#",
+        "#........∩#",
         "###########"
       ],
       "exits": [
         {
-          "x": 1,
+          "x": 0,
           "y": 4,
           "target_location_id": "outer_fields",
           "target_x": 13,
           "target_y": 5,
           "target_facing": "W",
           "message": "You squeeze back into the cold open air beyond the cave mouth."
+        },
+        {
+          "x": 9,
+          "y": 7,
+          "transition": "generated_dungeon",
+          "biome_id": "sunken_archive",
+          "floor_number": 1,
+          "target_facing": "N",
+          "message": "You follow the flooded stair below the cave and descend into drowned archive vaults."
         }
       ]
     }
@@ -199,7 +224,66 @@
       "room_min_size": 3,
       "room_max_size": 5,
       "encounter_rate": 28,
-      "return_message": "You climb back toward the approach, carrying the echo of the halls with you."
+      "return_message": "You climb back toward the approach, carrying the echo of the halls with you.",
+      "return_exit": {
+        "target_location_id": "dungeon_approach",
+        "target_x": 4,
+        "target_y": 5,
+        "target_facing": "S",
+        "message": "You climb back toward the approach, carrying the echo of the halls with you."
+      },
+      "floor_name_prefixes": [
+        "The Listening Cloister",
+        "The Broken Watch",
+        "The Ash Door Gallery"
+      ],
+      "floor_description_templates": [
+        "Floor {floor_number} of the {biome_name} opens around {feature}, with every footfall carried farther than it should.",
+        "The {biome_name} tighten into {feature} on this descent, forcing you to move as though the dark is listening.",
+        "Cracked stone and {feature} define this stretch of the {biome_name}, where the silence feels arranged."
+      ],
+      "floor_description_features": [
+        "collapsed shrines",
+        "blind alcoves",
+        "funeral braziers",
+        "dust-heavy transepts"
+      ]
+    },
+    {
+      "id": "sunken_archive",
+      "name": "Sunken Archive",
+      "description": "A drowned repository of stone shelves, warped ledgers, and patient things moving through the seep.",
+      "procgen_version": "v1",
+      "floor_width": 23,
+      "floor_height": 17,
+      "max_rooms": 7,
+      "room_min_size": 3,
+      "room_max_size": 6,
+      "encounter_rate": 30,
+      "return_message": "You wade back up the flooded stair and return to the whispering cave.",
+      "return_exit": {
+        "target_location_id": "whispering_cave",
+        "target_x": 8,
+        "target_y": 7,
+        "target_facing": "W",
+        "message": "You wade back up the flooded stair and return to the whispering cave."
+      },
+      "floor_name_prefixes": [
+        "The Silt Ledger",
+        "The Floodbound Stacks",
+        "The Drowned Annex"
+      ],
+      "floor_description_templates": [
+        "Floor {floor_number} of the {biome_name} reeks of brine and ink, with {feature} breaking the waterline.",
+        "The {biome_name} spread into {feature}, where every shelf seems to lean toward you through the dark.",
+        "Cold seepwater laps at {feature} in this reach of the {biome_name}, and even the silence sounds waterlogged."
+      ],
+      "floor_description_features": [
+        "fallen catalog pillars",
+        "split reading desks",
+        "silt-choked index alcoves",
+        "chains of warped tablets"
+      ]
     }
   ],
   "starting_inventory": [
@@ -234,6 +318,106 @@
       "stackable": true,
       "value": 8,
       "description": "A harsh red tonic that closes wounds fast enough to matter."
+    },
+    {
+      "id": "brine_balm",
+      "name": "Brine Balm",
+      "item_type": "consumable",
+      "damage": 0,
+      "healing": 4,
+      "stackable": true,
+      "value": 9,
+      "description": "A salty blue salve in waxed cloth, good for shallow cuts and cave-fever chills."
+    },
+    {
+      "id": "amber_tonic",
+      "name": "Amber Tonic",
+      "item_type": "consumable",
+      "damage": 0,
+      "healing": 8,
+      "stackable": true,
+      "value": 14,
+      "description": "A dense stimulant brewed for delvers who need to keep moving after the first bad wound."
+    },
+    {
+      "id": "marta_ledger_satchel",
+      "name": "Ledger Satchel",
+      "item_type": "quest",
+      "damage": 0,
+      "healing": 0,
+      "stackable": false,
+      "value": 0,
+      "description": "A swollen leather satchel packed with Marta's room ledgers and damp receipts."
+    },
+    {
+      "id": "marta_cellar_key",
+      "name": "Cellar Key",
+      "item_type": "quest",
+      "damage": 0,
+      "healing": 0,
+      "stackable": false,
+      "value": 0,
+      "description": "A weighty iron key ring tagged in Marta's tight block script."
+    },
+    {
+      "id": "ilya_lost_lamp",
+      "name": "Lamplighter's Lamp",
+      "item_type": "quest",
+      "damage": 0,
+      "healing": 0,
+      "stackable": false,
+      "value": 0,
+      "description": "An oil lamp with Ilya's maker marks still cut into the handle."
+    },
+    {
+      "id": "ilya_watch_oil",
+      "name": "Watch Oil Flask",
+      "item_type": "quest",
+      "damage": 0,
+      "healing": 0,
+      "stackable": false,
+      "value": 0,
+      "description": "A sealed brass flask of clear lamp oil stamped for the town watch posts."
+    },
+    {
+      "id": "petra_scout_compass",
+      "name": "Scout Compass",
+      "item_type": "quest",
+      "damage": 0,
+      "healing": 0,
+      "stackable": false,
+      "value": 0,
+      "description": "A brass compass scored by old impacts and notched with Petra's route marks."
+    },
+    {
+      "id": "petra_route_case",
+      "name": "Route Case",
+      "item_type": "quest",
+      "damage": 0,
+      "healing": 0,
+      "stackable": false,
+      "value": 0,
+      "description": "A waxed map case bound with scout cord and packed with route slips."
+    },
+    {
+      "id": "sava_spore_case",
+      "name": "Spore Case",
+      "item_type": "quest",
+      "damage": 0,
+      "healing": 0,
+      "stackable": false,
+      "value": 0,
+      "description": "A lacquered sample case lined with dried moss and Sava's careful labels."
+    },
+    {
+      "id": "sava_amber_vial",
+      "name": "Amber Vial",
+      "item_type": "quest",
+      "damage": 0,
+      "healing": 0,
+      "stackable": false,
+      "value": 0,
+      "description": "A narrow glass vial of resin-colored extract wrapped in waxed thread."
     }
   ],
   "enemies": [
@@ -288,7 +472,7 @@
         "  /^-^\\ ",
         " ( o o )",
         " /| ^ |\\",
-        "  /   \\\\"
+        "  /   \\"
       ],
       "max_hp": 5,
       "damage": 3,
@@ -321,6 +505,72 @@
         {
           "item_id": "health_potion",
           "chance": 0.3,
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "drowned_scribe",
+      "name": "Drowned Scribe",
+      "ascii_art": [
+        "  .--.  ",
+        " (o~~o) ",
+        " /|[]|\\",
+        "  /__\\  "
+      ],
+      "max_hp": 6,
+      "damage": 3,
+      "defence": 0,
+      "gold_drop": [4, 7],
+      "description": "A soaked archivist-shade that still reaches for names worth dragging under.",
+      "loot_table": [
+        {
+          "item_id": "brine_balm",
+          "chance": 0.3,
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "ledger_leech",
+      "name": "Ledger Leech",
+      "ascii_art": [
+        "  .--.  ",
+        " ( .. ) ",
+        " /|~~|\\",
+        "  \\__/  "
+      ],
+      "max_hp": 4,
+      "damage": 2,
+      "defence": 0,
+      "gold_drop": [2, 4],
+      "description": "A fat cave parasite slick with ink-black seep and attracted to warm blood.",
+      "loot_table": [
+        {
+          "item_id": "brine_balm",
+          "chance": 0.18,
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "silt_mimic",
+      "name": "Silt Mimic",
+      "ascii_art": [
+        "  /^\\  ",
+        " [o==o] ",
+        " /|##|\\",
+        "  /__\\  "
+      ],
+      "max_hp": 9,
+      "damage": 4,
+      "defence": 1,
+      "gold_drop": [5, 8],
+      "description": "A sediment-caked thing that learned the shape of a reliquary before it learned hunger.",
+      "loot_table": [
+        {
+          "item_id": "amber_tonic",
+          "chance": 0.22,
           "quantity": 1
         }
       ]
@@ -362,6 +612,18 @@
         "moss_lantern": "A Moss Lantern brightens in the dark and drifts toward you with a funeral hum.",
         "tomb_sentinel": "A Tomb Sentinel stamps forward from the masonry and lowers its stone-cut blade."
       }
+    },
+    {
+      "id": "sunken_archive_floor_1",
+      "biome_id": "sunken_archive",
+      "floor_number": 1,
+      "enemy_ids": ["drowned_scribe", "ledger_leech", "silt_mimic"],
+      "message": "{enemy_name} rises from the flooded archive and blocks your route.",
+      "message_by_enemy": {
+        "drowned_scribe": "A Drowned Scribe peels itself away from a tilted shelf and reaches for you with dripping hands.",
+        "ledger_leech": "A Ledger Leech drops from the shelving in a wet arc and snaps for exposed flesh.",
+        "silt_mimic": "What looked like a half-buried reliquary unfolds into a Silt Mimic and lurches across the room."
+      }
     }
   ],
   "npcs": [
@@ -373,7 +635,7 @@
         "  .--.  ",
         " (o__o) ",
         " /|##|\\",
-        "  /  \\\\ "
+        "  /  \\ "
       ],
       "role": "Innkeeper",
       "location_id": "town_square",
@@ -393,7 +655,7 @@
         "  .--.  ",
         " ( -.-) ",
         " /|\\/|\\",
-        "  /_ \\\\ "
+        "  /_ \\ "
       ],
       "role": "Lamplighter",
       "location_id": "town_square",
@@ -413,7 +675,7 @@
         "  /^\\  ",
         " (o..o) ",
         " /|==|\\",
-        "  /  \\\\ "
+        "  /  \\ "
       ],
       "role": "Scout",
       "location_id": "dungeon_approach",
