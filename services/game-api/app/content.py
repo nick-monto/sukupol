@@ -122,6 +122,72 @@ def validate_enemy(enemy: dict[str, Any], items: dict[str, dict[str, Any]]) -> N
         if item_id not in items:
             raise ValueError(f"Enemy {enemy.get('id', '<unknown>')} references unknown loot item {item_id}")
 
+    communication_mode = enemy.get("communication_mode")
+    if communication_mode is not None and communication_mode not in {"speech", "telepathy"}:
+        raise ValueError(
+            f"Enemy {enemy.get('id', '<unknown>')} communication_mode must be speech or telepathy"
+        )
+
+    negotiation = enemy.get("negotiation")
+    if negotiation is None:
+        return
+
+    if communication_mode not in {"speech", "telepathy"}:
+        raise ValueError(
+            f"Enemy {enemy.get('id', '<unknown>')} negotiation requires communication_mode"
+        )
+
+    if not isinstance(negotiation, dict):
+        raise ValueError(f"Enemy {enemy.get('id', '<unknown>')} negotiation must be an object")
+
+    temperament = negotiation.get("temperament", "wary")
+    if temperament not in {"wary", "resentful", "irate"}:
+        raise ValueError(
+            f"Enemy {enemy.get('id', '<unknown>')} negotiation temperament must be wary, resentful, or irate"
+        )
+
+    can_negotiate = bool(negotiation.get("can_negotiate", True))
+    outcomes = negotiation.get("outcomes", [])
+    if not isinstance(outcomes, list):
+        raise ValueError(f"Enemy {enemy.get('id', '<unknown>')} negotiation outcomes must be a list")
+
+    invalid_outcomes = [outcome for outcome in outcomes if outcome not in {"recruit", "tribute", "retreat"}]
+    if invalid_outcomes:
+        raise ValueError(
+            f"Enemy {enemy.get('id', '<unknown>')} negotiation has unsupported outcomes: {', '.join(invalid_outcomes)}"
+        )
+
+    if can_negotiate and not outcomes:
+        raise ValueError(
+            f"Enemy {enemy.get('id', '<unknown>')} must define at least one negotiation outcome when can_negotiate is true"
+        )
+
+    difficulty = int(negotiation.get("difficulty", 5))
+    anger_limit = int(negotiation.get("anger_limit", 2))
+    if not 1 <= difficulty <= 10:
+        raise ValueError(f"Enemy {enemy.get('id', '<unknown>')} negotiation difficulty must be between 1 and 10")
+    if anger_limit < 1:
+        raise ValueError(f"Enemy {enemy.get('id', '<unknown>')} negotiation anger_limit must be at least 1")
+
+    if "recruit" in outcomes:
+        ally_battles = int(negotiation.get("ally_battles", 0))
+        if ally_battles < 1:
+            raise ValueError(
+                f"Enemy {enemy.get('id', '<unknown>')} must define ally_battles >= 1 for recruit outcomes"
+            )
+
+    tribute_item_id = negotiation.get("tribute_item_id")
+    if tribute_item_id is not None:
+        if tribute_item_id not in items:
+            raise ValueError(
+                f"Enemy {enemy.get('id', '<unknown>')} negotiation references unknown tribute item {tribute_item_id}"
+            )
+        tribute_quantity = int(negotiation.get("tribute_quantity", 1))
+        if tribute_quantity < 1:
+            raise ValueError(
+                f"Enemy {enemy.get('id', '<unknown>')} negotiation tribute_quantity must be at least 1"
+            )
+
 
 def validate_procgen_biome(
     biome: dict[str, Any],
@@ -133,6 +199,28 @@ def validate_procgen_biome(
             continue
         if not isinstance(field_value, list) or not field_value or not all(isinstance(entry, str) and entry for entry in field_value):
             raise ValueError(f"Biome {biome.get('id', '<unknown>')} must define {field_name} as a non-empty list of strings")
+
+    generation_profile = biome.get("generation_profile")
+    if generation_profile is not None and (not isinstance(generation_profile, str) or not generation_profile):
+        raise ValueError(f"Biome {biome.get('id', '<unknown>')} generation_profile must be a non-empty string")
+
+    for mapping_name in ("generation_settings", "depth_progression"):
+        mapping = biome.get(mapping_name)
+        if mapping is None:
+            continue
+        if not isinstance(mapping, dict):
+            raise ValueError(f"Biome {biome.get('id', '<unknown>')} {mapping_name} must be an object")
+        for key, value in mapping.items():
+            if not isinstance(key, str) or not key:
+                raise ValueError(f"Biome {biome.get('id', '<unknown>')} {mapping_name} contains an invalid key")
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"Biome {biome.get('id', '<unknown>')} {mapping_name}.{key} must be numeric")
+
+    for field_name in ("landmark_types", "hazard_types"):
+        feature_pool = biome.get(field_name)
+        if feature_pool is None:
+            continue
+        validate_procgen_feature_pool(feature_pool, f"Biome {biome.get('id', '<unknown>')} {field_name}")
 
     return_exit = biome.get("return_exit")
     if return_exit is None:
@@ -155,6 +243,42 @@ def validate_procgen_biome(
 
     if not isinstance(return_exit.get("message"), str) or not return_exit["message"]:
         raise ValueError(f"Biome {biome.get('id', '<unknown>')} return_exit must define a non-empty message")
+
+
+def validate_procgen_feature_pool(feature_pool: Any, label: str) -> None:
+    if not isinstance(feature_pool, list) or not feature_pool:
+        raise ValueError(f"{label} must be a non-empty list")
+
+    for entry in feature_pool:
+        if isinstance(entry, str):
+            if not entry:
+                raise ValueError(f"{label} cannot include an empty feature kind")
+            continue
+        if not isinstance(entry, dict):
+            raise ValueError(f"{label} entries must be strings or objects")
+        if not isinstance(entry.get("kind"), str) or not entry["kind"]:
+            raise ValueError(f"{label} object entries must define a non-empty kind")
+        if "variant" in entry and (not isinstance(entry["variant"], str) or not entry["variant"]):
+            raise ValueError(f"{label} entry {entry['kind']} has an invalid variant")
+        if "detail" in entry and (not isinstance(entry["detail"], str) or not entry["detail"]):
+            raise ValueError(f"{label} entry {entry['kind']} has an invalid detail")
+        for numeric_field in ("weight", "radius", "min_floor", "max_floor"):
+            if numeric_field not in entry:
+                continue
+            value = entry[numeric_field]
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError(f"{label} entry {entry['kind']} field {numeric_field} must be an integer")
+        if int(entry.get("weight", 1)) < 1:
+            raise ValueError(f"{label} entry {entry['kind']} weight must be at least 1")
+        if int(entry.get("radius", 0)) < 0:
+            raise ValueError(f"{label} entry {entry['kind']} radius must be zero or greater")
+        min_floor = int(entry.get("min_floor", 1))
+        max_floor = int(entry.get("max_floor", min_floor))
+        if min_floor < 1 or max_floor < min_floor:
+            raise ValueError(f"{label} entry {entry['kind']} must define a valid min/max floor range")
+        tags = entry.get("tags", [])
+        if not isinstance(tags, list) or not all(isinstance(tag, str) and tag for tag in tags):
+            raise ValueError(f"{label} entry {entry['kind']} tags must be a list of non-empty strings")
 
 
 def validate_overworld_map(location: dict[str, Any], used_positions: set[tuple[int, int]]) -> None:

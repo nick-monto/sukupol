@@ -43,7 +43,7 @@ export type CombatPresentation = {
 export type CombatAction = {
   id: string;
   label: string;
-  kind: "attack" | "defend" | "item" | "flee";
+  kind: "attack" | "defend" | "item" | "flee" | "parley";
   enabled: boolean;
   item_id?: string | null;
 };
@@ -51,9 +51,40 @@ export type CombatAction = {
 export type CombatEvent = {
   id: string;
   round: number;
-  actor: "player" | "enemy" | "system";
+  actor: "player" | "enemy" | "ally" | "system";
   text: string;
-  emphasis: "entry" | "impact" | "guard" | "item" | "system" | "warning";
+  emphasis: "entry" | "impact" | "guard" | "item" | "system" | "warning" | "support" | "parley";
+};
+
+export type CombatNegotiationOption = {
+  id: string;
+  label: string;
+  outcome: "recruit" | "tribute" | "retreat";
+  enabled: boolean;
+};
+
+export type CombatNegotiationEntry = {
+  speaker: "player" | "enemy" | "system";
+  text: string;
+};
+
+export type CombatNegotiationState = {
+  communication_mode: "speech" | "telepathy";
+  temperament: "wary" | "resentful" | "irate";
+  available: boolean;
+  channel_ready?: boolean;
+  locked: boolean;
+  active: boolean;
+  attempts: number;
+  anger: number;
+  anger_limit: number;
+  leverage: number;
+  difficulty: number;
+  lock_reason: string;
+  active_intent?: string | null;
+  outcome?: string | null;
+  options: CombatNegotiationOption[];
+  transcript: CombatNegotiationEntry[];
 };
 
 export type CombatPartySlot = {
@@ -80,6 +111,7 @@ export type CombatEnemy = {
 };
 
 export type CombatState = {
+  mode?: "turn-based";
   status: "engaged";
   round: number;
   enemy: CombatEnemy;
@@ -87,6 +119,7 @@ export type CombatState = {
   available_actions: CombatAction[];
   events: CombatEvent[];
   log: string[];
+  negotiation?: CombatNegotiationState | null;
 };
 
 export type ViewportTransition =
@@ -99,6 +132,7 @@ export type PresentationLock = {
   transition: "combat-exit";
   combatState: CombatState;
   token: number;
+  startedAt: number;
 };
 
 export type Snapshot = {
@@ -215,7 +249,7 @@ export type Snapshot = {
 export type DialogueMessage = {
   id: string;
   sequence: number;
-  speaker: "player" | "npc" | "system";
+  speaker: "player" | "npc" | "ally" | "system";
   text: string;
   npcId?: string;
   npcName?: string;
@@ -227,6 +261,10 @@ export type AppState = {
   bootstrapTitle: string;
   runId: string;
   snapshot: Snapshot | null;
+  journalOpen: boolean;
+  mapOpen: boolean;
+  inventoryOpen: boolean;
+  dialogueOpen: boolean;
   selectedNpcId: string;
   dialogueThreads: Record<string, DialogueMessage[]>;
   streamingDialogue: {

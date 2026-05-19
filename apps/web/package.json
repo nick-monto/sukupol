@@ -9,10 +9,13 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/matter-js": "^0.20.2",
     "typescript": "^5.8.3",
     "vite": "^7.0.0"
   },
   "dependencies": {
+    "matter-attractors": "^0.1.6",
+    "matter-js": "^0.20.0",
     "pixi.js": "^7.4.3"
   }
 }

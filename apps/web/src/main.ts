@@ -11,6 +11,10 @@ const state: AppState = {
   bootstrapTitle: "Sukupol",
   runId: "",
   snapshot: null,
+  journalOpen: false,
+  mapOpen: false,
+  inventoryOpen: false,
+  dialogueOpen: false,
   selectedNpcId: "",
   dialogueThreads: {},
   streamingDialogue: null,
@@ -31,7 +35,7 @@ app.innerHTML = createAppMarkup(state.bootstrapTitle);
 
 const ui = getUiElements();
 
-bindInteractionHandlers({
+const { managePinball } = bindInteractionHandlers({
   apiBase,
   state,
   ui,
@@ -47,6 +51,7 @@ function render(): void {
     state.viewportTransition = "none";
   }
   syncBusyState(ui, state);
+  managePinball();
 
   bindNpcSelection(ui, async (npcId) => {
     if (!npcId) {
@@ -64,6 +69,7 @@ function render(): void {
     }
 
     state.selectedNpcId = npcId;
+    state.dialogueOpen = true;
     render();
   });
 }

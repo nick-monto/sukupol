@@ -56,6 +56,7 @@ class RunState:
     outcome_summary: dict[str, Any] | None = None
     progression: dict[str, Any] | None = None
     active_dialogue_visits: dict[str, dict[str, Any]] | None = None
+    party_allies: list[dict[str, Any]] | None = None
     discovered_overworld_locations: list[str] | None = None
     discovered_overworld_connections: list[ConnectionPair] | None = None
 
@@ -133,6 +134,7 @@ def state_from_dict(payload: dict[str, Any]) -> RunState:
         outcome_summary=payload.get("outcome_summary"),
         progression=payload.get("progression"),
         active_dialogue_visits=payload.get("active_dialogue_visits", {}),
+        party_allies=payload.get("party_allies", []),
         discovered_overworld_locations=discovered_locations,
         discovered_overworld_connections=discovered_connections,
     )
@@ -324,7 +326,9 @@ def direction_for_delta(dx: int, dy: int) -> str:
 def encounter_context_for_location(world: WorldContent, location: dict[str, Any]) -> dict[str, Any]:
     biome_id = location.get("encounter_biome_id") or location.get("biome_id")
     biome = world.dungeon_biomes.get(biome_id) if biome_id else None
-    enabled = bool(location.get("encounter_enabled", False))
+    location_type = str(location.get("location_type", "site")).strip().lower() or "site"
+    explicit_enabled = location.get("encounter_enabled")
+    enabled = bool(explicit_enabled) if explicit_enabled is not None else location_type not in {"town", "city"}
     floor_number = int(location.get("encounter_floor", location.get("floor_number", 0) or 0))
     encounter_rate = int(location.get("encounter_rate", biome.get("encounter_rate", 0) if biome else 0))
     return {
@@ -332,7 +336,7 @@ def encounter_context_for_location(world: WorldContent, location: dict[str, Any]
         "biome_id": biome_id,
         "floor_number": floor_number,
         "encounter_rate": encounter_rate,
-        "location_type": str(location.get("location_type", "site")),
+        "location_type": location_type,
     }
 
 
@@ -537,6 +541,10 @@ def map_variant_for_position(
     if glyph in {"<", "∪", "∩"}:
         return "threshold"
 
+    procgen_variant = procgen_variant_for_position(location, x, y)
+    if procgen_variant is not None:
+        return procgen_variant
+
     biome_id = location.get("biome_id", "")
     location_type = location.get("location_type", "")
     checksum = sum(ord(character) for character in f"{location['id']}:{biome_id}:{location_type}") + (x * 17) + (y * 31)
@@ -555,6 +563,37 @@ def map_variant_for_position(
     if wall_neighbors >= 1 and checksum % 4 == 0:
         return "rubble"
     return "plain"
+
+
+def procgen_variant_for_position(location: dict[str, Any], x: int, y: int) -> str | None:
+    best_match: tuple[int, str] | None = None
+    for feature in location.get("procgen_features", []):
+        variant = feature.get("variant") or default_variant_for_feature(feature.get("kind", ""))
+        if not variant:
+            continue
+        radius = max(0, int(feature.get("radius", 0)))
+        distance = abs(int(feature.get("x", -99)) - x) + abs(int(feature.get("y", -99)) - y)
+        if distance > radius:
+            continue
+        if best_match is None or distance < best_match[0]:
+            best_match = (distance, variant)
+    return best_match[1] if best_match is not None else None
+
+
+def default_variant_for_feature(kind: str) -> str | None:
+    feature_variants = {
+        "shrine": "dust",
+        "memorial_alcove": "dust",
+        "watch_post": "moss",
+        "collapse": "rubble",
+        "chokepoint": "rubble",
+        "flooded_room": "wet",
+        "seep": "wet",
+        "silt_cache": "dust",
+        "archive_nexus": "moss",
+        "quiet_room": "dust",
+    }
+    return feature_variants.get(kind)
 
 
 def count_adjacent_walls(rows: list[list[str]], x: int, y: int) -> int:

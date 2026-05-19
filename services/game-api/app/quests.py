@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .agents.quest_agents import QuestOfferContext, QuestResponseContext
+from .agents.quest_generation import QuestGenerationService
 from .db import (
     create_player_quest,
     list_player_quests,
@@ -493,6 +495,7 @@ def maybe_offer_conversation_quest(
     state: Any,
     npc: dict[str, Any],
     player_message: str,
+    quest_generation_service: QuestGenerationService | None = None,
 ) -> dict[str, Any] | None:
     if not _triggered_by_message(player_message):
         return None
@@ -508,14 +511,32 @@ def maybe_offer_conversation_quest(
     if existing is not None:
         return None
 
+    biome_name = world.dungeon_biomes[payload["target_biome_id"]]["name"]
+    generated_offer = None
+    if quest_generation_service is not None:
+        generated_offer = quest_generation_service.generate_offer(
+            QuestOfferContext(
+                npc=npc,
+                player_name=state.player_name,
+                player_message=player_message,
+                biome_name=biome_name,
+                item_name=payload["item_name"],
+                reward_gold=payload["reward_gold"],
+                hint=payload["hint"],
+            )
+        )
+    title = generated_offer["title"] if generated_offer is not None else payload["title"]
+    summary = generated_offer["summary"] if generated_offer is not None else payload["summary"]
+    objective_text = generated_offer["objective_text"] if generated_offer is not None else payload["objective_text"]
+
     row = create_player_quest(
         player_id=state.player_id,
         template_id=payload["template_id"],
         run_id=state.id,
         offered_by_npc_id=npc["id"],
-        title=payload["title"],
-        summary=payload["summary"],
-        objective_text=payload["objective_text"],
+        title=title,
+        summary=summary,
+        objective_text=objective_text,
         objective_kind=payload["objective_kind"],
         target_location_id=payload["target_location_id"],
         target_biome_id=payload["target_biome_id"],
@@ -528,7 +549,12 @@ def maybe_offer_conversation_quest(
     serialized = _serialize_quest_row(world, state, row)
     biome_name = serialized.get("target_biome_name") or payload["target_biome_id"]
     offer_templates = tuple(payload.get("offer_templates") or OFFER_TEMPLATES)
-    offer_text = _pick(offer_templates, state.run_seed, npc["id"], payload["item_id"]).format(
+    offer_text = generated_offer["offer_text"] if generated_offer is not None else _pick(
+        offer_templates,
+        state.run_seed,
+        npc["id"],
+        payload["item_id"],
+    ).format(
         biome_name=biome_name,
         item_label=_item_label(payload["item_name"]),
         item_name=payload["item_name"],
@@ -539,7 +565,12 @@ def maybe_offer_conversation_quest(
     return serialized
 
 
-def accept_offered_quest(world: Any, state: Any, quest_id: str) -> dict[str, Any]:
+def accept_offered_quest(
+    world: Any,
+    state: Any,
+    quest_id: str,
+    quest_generation_service: QuestGenerationService | None = None,
+) -> dict[str, Any]:
     row = load_player_quest(state.player_id, quest_id)
     if row is None:
         raise ValueError("Quest not found")
@@ -554,17 +585,35 @@ def accept_offered_quest(world: Any, state: Any, quest_id: str) -> dict[str, Any
     serialized = _serialize_quest_row(world, state, refreshed)
     profile = _profile_for_template(refreshed["offered_by_npc_id"], serialized["target_item_id"])
     accept_templates = profile.accept_templates if profile and profile.accept_templates else ACCEPT_TEMPLATES
-    serialized["response_text"] = _pick(accept_templates, state.run_seed, quest_id).format(
+    fallback_text = _pick(accept_templates, state.run_seed, quest_id).format(
         item_name=serialized["target_item_name"],
         item_label=_item_label(serialized["target_item_name"]),
         npc_name=serialized["offered_by_npc_name"],
         biome_name=serialized.get("target_biome_name") or refreshed.get("target_biome_id") or "the dungeon",
         reward_gold=serialized["reward_gold"],
     )
+    generated_text = None
+    if quest_generation_service is not None:
+        generated_text = quest_generation_service.generate_response(
+            QuestResponseContext(
+                npc_name=serialized["offered_by_npc_name"],
+                biome_name=serialized.get("target_biome_name") or refreshed.get("target_biome_id") or "the dungeon",
+                item_name=serialized["target_item_name"],
+                reward_gold=serialized["reward_gold"],
+                hint=serialized.get("hint", ""),
+                stance="accept",
+            )
+        )
+    serialized["response_text"] = generated_text or fallback_text
     return serialized
 
 
-def decline_offered_quest(world: Any, state: Any, quest_id: str) -> dict[str, Any]:
+def decline_offered_quest(
+    world: Any,
+    state: Any,
+    quest_id: str,
+    quest_generation_service: QuestGenerationService | None = None,
+) -> dict[str, Any]:
     row = load_player_quest(state.player_id, quest_id)
     if row is None:
         raise ValueError("Quest not found")
@@ -577,11 +626,29 @@ def decline_offered_quest(world: Any, state: Any, quest_id: str) -> dict[str, An
         raise ValueError("Quest disappeared after decline")
 
     serialized = _serialize_quest_row(world, state, refreshed)
-    serialized["response_text"] = _pick(DECLINE_TEMPLATES, state.run_seed, quest_id)
+    fallback_text = _pick(DECLINE_TEMPLATES, state.run_seed, quest_id)
+    generated_text = None
+    if quest_generation_service is not None:
+        generated_text = quest_generation_service.generate_response(
+            QuestResponseContext(
+                npc_name=serialized["offered_by_npc_name"],
+                biome_name=serialized.get("target_biome_name") or refreshed.get("target_biome_id") or "the dungeon",
+                item_name=serialized["target_item_name"],
+                reward_gold=serialized["reward_gold"],
+                hint=serialized.get("hint", ""),
+                stance="decline",
+            )
+        )
+    serialized["response_text"] = generated_text or fallback_text
     return serialized
 
 
-def maybe_complete_quest_turn_in(world: Any, state: Any, npc_id: str) -> dict[str, Any] | None:
+def maybe_complete_quest_turn_in(
+    world: Any,
+    state: Any,
+    npc_id: str,
+    quest_generation_service: QuestGenerationService | None = None,
+) -> dict[str, Any] | None:
     for row in list_player_quests(state.player_id):
         if row["offered_by_npc_id"] != npc_id or row["status"] != "active":
             continue
@@ -604,13 +671,26 @@ def maybe_complete_quest_turn_in(world: Any, state: Any, npc_id: str) -> dict[st
         serialized = _serialize_quest_row(world, state, refreshed)
         profile = _profile_for_template(row["offered_by_npc_id"], template["item_id"])
         complete_templates = profile.complete_templates if profile and profile.complete_templates else COMPLETE_TEMPLATES
-        serialized["response_text"] = _pick(complete_templates, state.run_seed, row["id"]).format(
+        fallback_text = _pick(complete_templates, state.run_seed, row["id"]).format(
             item_name=item_name,
             item_label=_item_label(item_name),
             npc_name=world.npcs[npc_id]["display_name"],
             biome_name=serialized.get("target_biome_name") or template["target_biome_id"],
             reward_gold=reward_gold,
         )
+        generated_text = None
+        if quest_generation_service is not None:
+            generated_text = quest_generation_service.generate_response(
+                QuestResponseContext(
+                    npc_name=world.npcs[npc_id]["display_name"],
+                    biome_name=serialized.get("target_biome_name") or template["target_biome_id"],
+                    item_name=item_name,
+                    reward_gold=reward_gold,
+                    hint=serialized.get("hint", ""),
+                    stance="complete",
+                )
+            )
+        serialized["response_text"] = generated_text or fallback_text
         return serialized
     return None
 

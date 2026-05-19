@@ -4,12 +4,14 @@ from contextlib import asynccontextmanager
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from .agents import AgentExecutor, CombatParleyService, JournalService, QuestGenerationService
 from .content import WorldContent, load_world_content
 from .combat import maybe_start_encounter, resolve_turn
 from .db import (
@@ -51,6 +53,7 @@ class RunScopedRequest(BaseModel):
 
 class CombatRequest(BaseModel):
     action: str
+    message: str | None = Field(default=None, max_length=500)
 
 
 ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
@@ -83,7 +86,15 @@ async def lifespan(app: FastAPI):
     initialize_database(world)
     app.state.world = world
     app.state.runs = {}
-    app.state.dialogue = NpcDialogueService()
+    app.state.agent_executor = AgentExecutor()
+    app.state.journal = JournalService(executor=app.state.agent_executor)
+    app.state.quest_generation = QuestGenerationService(executor=app.state.agent_executor)
+    app.state.dialogue = NpcDialogueService(
+        executor=app.state.agent_executor,
+        journal_service=app.state.journal,
+        quest_generation_service=app.state.quest_generation,
+    )
+    app.state.parley = CombatParleyService(executor=app.state.agent_executor)
     yield
 
 
@@ -161,6 +172,8 @@ def ensure_generated_floor(state: RunState, biome_id: str, floor_number: int) ->
             exits=layout.exits,
             entry_x=layout.entry_x,
             entry_y=layout.entry_y,
+            procgen_features=layout.features,
+            generation=layout.generation,
             validation=layout.validation,
         )
         floor = load_dungeon_floor(layout.location_id)
@@ -210,6 +223,18 @@ def finalize_and_persist(state: RunState, result: str) -> None:
 
 def build_authoritative_snapshot(state: RunState) -> dict:
     return build_snapshot(get_world(), state)
+
+
+def resolve_combat_request(state: RunState, action: str, message: str | None = None) -> dict:
+    world = get_world()
+    if not state.in_combat:
+        raise HTTPException(status_code=400, detail="No active combat")
+
+    resolve_turn(world, state, action, message=message, parley_service=app.state.parley)
+    if state.run_result == "death":
+        finalize_and_persist(state, "death")
+    save_run_snapshot(state_to_dict(state))
+    return build_authoritative_snapshot(state)
 
 
 @app.get("/api/health")
@@ -285,16 +310,8 @@ def act(run_id: str, request: ActionRequest) -> dict:
 
 @app.post("/api/runs/{run_id}/combat")
 def combat(run_id: str, request: CombatRequest) -> dict:
-    world = get_world()
     state = get_run_state(run_id)
-    if not state.in_combat:
-        raise HTTPException(status_code=400, detail="No active combat")
-
-    resolve_turn(world, state, request.action)
-    if state.run_result == "death":
-        finalize_and_persist(state, "death")
-    save_run_snapshot(state_to_dict(state))
-    return build_authoritative_snapshot(state)
+    return resolve_combat_request(state, request.action, message=request.message)
 
 
 @app.post("/api/runs/{run_id}/extract")
@@ -400,7 +417,7 @@ def accept_quest(quest_id: str, request: RunScopedRequest) -> dict:
         raise HTTPException(status_code=400, detail="Quest giver is not nearby")
 
     try:
-        quest = accept_offered_quest(world, state, quest_id)
+        quest = accept_offered_quest(world, state, quest_id, quest_generation_service=app.state.quest_generation)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     save_run_snapshot(state_to_dict(state))
@@ -426,7 +443,7 @@ def decline_quest(quest_id: str, request: RunScopedRequest) -> dict:
         raise HTTPException(status_code=400, detail="Quest giver is not nearby")
 
     try:
-        quest = decline_offered_quest(world, state, quest_id)
+        quest = decline_offered_quest(world, state, quest_id, quest_generation_service=app.state.quest_generation)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     save_run_snapshot(state_to_dict(state))

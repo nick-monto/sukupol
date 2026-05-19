@@ -2,6 +2,8 @@ import { api } from "./api";
 import type { AppState, DialogueMessage, Snapshot, ViewportTransition } from "./types";
 import type { UiElements } from "./ui";
 import { isEditableTarget } from "./ui";
+import { setupPinball } from "./pinballCombat";
+import type { PinballTable } from "./pinballCombat";
 
 type ControllerOptions = {
   apiBase: string;
@@ -12,18 +14,62 @@ type ControllerOptions = {
 };
 
 const CHAT_DOCK_HEIGHT_KEY = "sukupol.chatDockHeight";
-const CHAT_DOCK_DEFAULT_HEIGHT = 520;
+const CHAT_DOCK_DEFAULT_HEIGHT = 300;
 const CHAT_DOCK_MIN_HEIGHT = 256;
 const CHAT_DOCK_MAX_HEIGHT_RATIO = 0.75;
+const COMBAT_EXIT_LOCK_MS = 320;
 
-export function bindInteractionHandlers(options: ControllerOptions): void {
+let activePinball: PinballTable | null = null;
+
+function getEquippedWeaponType(snapshot: Snapshot | null): string | null {
+  if (!snapshot?.equipped_weapon) return null;
+  const item = snapshot.inventory.find((i) => i.item_id === snapshot.equipped_weapon);
+  return item?.item_type ?? null;
+}
+
+function managePinballFn(options: ControllerOptions): void {
+  const { state } = options;
+  const inCombat = !!(state.snapshot?.in_combat && state.snapshot.combat_state && !state.presentationLock);
+
+  if (inCombat && !activePinball) {
+    const canvas = document.querySelector<HTMLCanvasElement>("#pinball-cabinet-canvas");
+    if (!canvas) return;
+    activePinball = setupPinball(canvas, {
+      equippedWeaponType: getEquippedWeaponType(state.snapshot ?? null),
+      onBumperHit: (_bumperId: string, _multiplier: number) => {
+        void runCombatActionRequest(options, "attack");
+      },
+      onBallDrain: () => {
+        void runCombatActionRequest(options, "attack");
+      },
+    });
+    return;
+  }
+
+  if (!inCombat && activePinball) {
+    activePinball.teardown();
+    activePinball = null;
+    return;
+  }
+
+  if (inCombat && activePinball) {
+    activePinball.setEquippedWeapon(getEquippedWeaponType(state.snapshot ?? null));
+  }
+}
+
+export function bindInteractionHandlers(options: ControllerOptions): { managePinball: () => void } {
   const { ui } = options;
 
   bindChatResize(ui);
+  bindHudToggles(options);
 
   document.addEventListener("keydown", async (event) => {
     const { state } = options;
-    if (!state.runId || state.busy || isCombatPresentationActive(state) || isEditableTarget(event.target)) {
+    if (isEditableTarget(event.target)) {
+      return;
+    }
+
+    if (!state.runId || state.busy || isCombatPresentationActive(state)) {
       return;
     }
 
@@ -52,19 +98,32 @@ export function bindInteractionHandlers(options: ControllerOptions): void {
     ui.sendMessageButton.click();
   });
 
-  ui.startRunButton.addEventListener("click", async () => {
+  ui.playerNameInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    ui.launchRunButton.click();
+  });
+
+  const startRun = async () => {
     const { state, apiBase, render, renderError } = options;
     if (state.busy) {
       return;
     }
+
+    const playerName = ui.playerNameInput.value.trim() || "Wayfarer";
+    ui.playerNameInput.value = playerName;
 
     state.busy = true;
     syncBusyState(ui, state);
     try {
       const snapshot = await api<Snapshot>(apiBase, "/api/runs", {
         method: "POST",
-        body: JSON.stringify({ player_name: "Wayfarer" }),
+        body: JSON.stringify({ player_name: playerName }),
       });
+      closeExplorationOverlays(state);
       state.runId = snapshot.run_id;
       state.snapshot = snapshot;
       state.selectedNpcId = "";
@@ -78,7 +137,10 @@ export function bindInteractionHandlers(options: ControllerOptions): void {
       state.busy = false;
       syncBusyState(ui, state);
     }
-  });
+  };
+
+  ui.startRunButton.addEventListener("click", startRun);
+  ui.launchRunButton.addEventListener("click", startRun);
 
   ui.extractRunButton.addEventListener("click", async () => {
     const { state, apiBase, render, renderError } = options;
@@ -92,6 +154,7 @@ export function bindInteractionHandlers(options: ControllerOptions): void {
       const snapshot = await api<Snapshot>(apiBase, `/api/runs/${state.runId}/extract`, {
         method: "POST",
       });
+      syncExplorationOverlays(state, snapshot);
       setViewportTransitionState(state, state.snapshot, snapshot, false);
       state.snapshot = snapshot;
       render();
@@ -138,14 +201,28 @@ export function bindInteractionHandlers(options: ControllerOptions): void {
   });
 
   ui.sendMessageButton.addEventListener("click", async () => {
-    const { state, render, renderError } = options;
-    if (!state.runId || !state.selectedNpcId || state.busy || isCombatPresentationActive(state)) {
+    const { state, render, renderError, apiBase } = options;
+    if (!state.runId || state.busy || isCombatPresentationActive(state)) {
       return;
     }
 
     const message = ui.playerMessage.value.trim();
     if (!message) {
       ui.playerMessage.focus();
+      return;
+    }
+
+    if (canSendCombatParleyMessage(state)) {
+      try {
+        ui.playerMessage.value = "";
+        await runCombatActionRequest(options, "parley_message", message);
+      } catch (error) {
+        renderError(error);
+      }
+      return;
+    }
+
+    if (!state.selectedNpcId) {
       return;
     }
 
@@ -183,28 +260,37 @@ export function bindInteractionHandlers(options: ControllerOptions): void {
     }
 
     const action = button.dataset.combatAction;
-    const { state, apiBase, render, renderError } = options;
+    const { state } = options;
     if (!action || !state.runId || state.busy || button.disabled) {
       return;
     }
+    await runCombatActionRequest(options, action);
+  });
 
-    state.busy = true;
-    syncBusyState(ui, state);
-    try {
-      const previousSnapshot = state.snapshot;
-      const snapshot = await api<Snapshot>(apiBase, `/api/runs/${state.runId}/combat`, {
-        method: "POST",
-        body: JSON.stringify({ action }),
-      });
-      setViewportTransitionState(state, previousSnapshot, snapshot, true);
-      state.snapshot = snapshot;
-      render();
-    } catch (error) {
-      renderError(error);
-    } finally {
-      state.busy = false;
-      syncBusyState(ui, state);
-    }
+  return { managePinball: () => managePinballFn(options) };
+}
+
+function bindHudToggles(options: ControllerOptions): void {
+  const { ui, state, render } = options;
+
+  ui.journalToggleButton.addEventListener("click", () => {
+    toggleExplorationOverlay(state, "journal");
+    render();
+  });
+
+  ui.mapToggleButton.addEventListener("click", () => {
+    toggleExplorationOverlay(state, "map");
+    render();
+  });
+
+  ui.inventoryToggleButton.addEventListener("click", () => {
+    toggleExplorationOverlay(state, "inventory");
+    render();
+  });
+
+  ui.dialogueToggleButton.addEventListener("click", () => {
+    toggleDialogueDrawer(state);
+    render();
   });
 }
 
@@ -352,6 +438,7 @@ async function streamNpcDialogue(options: ControllerOptions, npcId: string, mess
   }
 
   state.snapshot = finalSnapshot;
+  syncExplorationOverlays(state, finalSnapshot);
   if (finalSnapshot.dialogue) {
     finalizeNpcMessage(
       state,
@@ -378,6 +465,7 @@ export async function leaveNpcConversation(options: ControllerOptions, npcId?: s
   if (!state.runId || !targetNpcId || state.busy || state.snapshot?.run_result) {
     if (targetNpcId && state.selectedNpcId === targetNpcId) {
       state.selectedNpcId = "";
+      state.dialogueOpen = false;
       render();
     }
     return;
@@ -390,9 +478,11 @@ export async function leaveNpcConversation(options: ControllerOptions, npcId?: s
       method: "POST",
       body: JSON.stringify({ run_id: state.runId }),
     });
+    syncExplorationOverlays(state, snapshot);
     state.snapshot = snapshot;
     if (state.selectedNpcId === targetNpcId) {
       state.selectedNpcId = "";
+      state.dialogueOpen = false;
     }
     render();
   } catch (error) {
@@ -405,26 +495,35 @@ export async function leaveNpcConversation(options: ControllerOptions, npcId?: s
 
 export function syncBusyState(ui: UiElements, state: AppState): void {
   const combatPresentationActive = isCombatPresentationActive(state);
+  const combatParleyActive = canSendCombatParleyMessage(state);
 
   ui.startRunButton.disabled = false;
+  ui.launchRunButton.disabled = state.busy;
   ui.extractRunButton.disabled = !state.runId
     || combatPresentationActive
     || state.snapshot?.location.id !== "town_square"
     || !!state.snapshot?.run_result;
   ui.sendMessageButton.disabled = state.busy
-    || !state.selectedNpcId
     || !state.runId
     || combatPresentationActive
+    || (!combatParleyActive && !state.selectedNpcId)
     || !!state.snapshot?.run_result;
   ui.leaveConversationButton.disabled = state.busy
     || !state.selectedNpcId
     || !state.runId
+    || state.snapshot?.in_combat === true
     || combatPresentationActive
     || !!state.snapshot?.run_result;
   ui.playerMessage.disabled = state.busy
     || !state.runId
+    || (state.snapshot?.in_combat === true && !combatParleyActive)
     || combatPresentationActive
     || !!state.snapshot?.run_result;
+  ui.playerNameInput.disabled = state.busy;
+  ui.journalToggleButton.disabled = combatPresentationActive;
+  ui.mapToggleButton.disabled = combatPresentationActive || !state.snapshot || !!state.snapshot.run_result;
+  ui.inventoryToggleButton.disabled = combatPresentationActive || !state.snapshot || !!state.snapshot.run_result;
+  ui.dialogueToggleButton.disabled = combatPresentationActive || !state.runId || !!state.snapshot?.run_result;
 
   document.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((button) => {
     button.disabled = !state.runId || combatPresentationActive || !!state.snapshot?.run_result;
@@ -443,6 +542,44 @@ export function syncBusyState(ui: UiElements, state: AppState): void {
   });
 }
 
+function canSendCombatParleyMessage(state: AppState): boolean {
+  return state.snapshot?.in_combat === true && state.snapshot.combat_state?.negotiation?.active === true;
+}
+
+function applyCombatSnapshotUpdate(state: AppState, snapshot: Snapshot, isCombatAction: boolean): void {
+  const previousSnapshot = state.snapshot;
+  syncExplorationOverlays(state, snapshot);
+  setViewportTransitionState(state, previousSnapshot, snapshot, isCombatAction);
+  state.snapshot = snapshot;
+}
+
+async function runCombatActionRequest(options: ControllerOptions, action: string, message?: string): Promise<void> {
+  const { state, ui, apiBase, render, renderError } = options;
+  if (!action || !state.runId || state.busy) {
+    return;
+  }
+
+  state.busy = true;
+  syncBusyState(ui, state);
+  try {
+    const snapshot = await api<Snapshot>(apiBase, `/api/runs/${state.runId}/combat`, {
+      method: "POST",
+      body: JSON.stringify({ action, ...(message ? { message } : {}) }),
+    });
+
+    applyCombatSnapshotUpdate(state, snapshot, true);
+    render();
+    if (action === "parley_open" && snapshot.combat_state?.negotiation?.active) {
+      ui.playerMessage.focus();
+    }
+  } catch (error) {
+    renderError(error);
+  } finally {
+    state.busy = false;
+    syncBusyState(ui, state);
+  }
+}
+
 async function runAction(options: ControllerOptions, action: string): Promise<void> {
   const { state, ui, apiBase, render, renderError } = options;
   if (!state.runId || state.busy) {
@@ -457,10 +594,12 @@ async function runAction(options: ControllerOptions, action: string): Promise<vo
       method: "POST",
       body: JSON.stringify({ action }),
     });
+    syncExplorationOverlays(state, snapshot);
     setViewportTransitionState(state, previousSnapshot, snapshot, false);
     state.snapshot = snapshot;
     if (state.selectedNpcId && !snapshot.nearby_npcs.some((npc) => npc.id === state.selectedNpcId)) {
       state.selectedNpcId = "";
+      state.dialogueOpen = false;
     }
     render();
   } catch (error) {
@@ -506,6 +645,7 @@ function setViewportTransitionState(
       transition,
       combatState: previousSnapshot.combat_state,
       token: state.presentationToken,
+      startedAt: performance.now(),
     };
     return;
   }
@@ -514,7 +654,23 @@ function setViewportTransitionState(
 }
 
 function isCombatPresentationActive(state: AppState): boolean {
-  return state.snapshot?.in_combat === true || state.presentationLock?.transition === "combat-exit";
+  if (state.snapshot?.in_combat === true) {
+    return true;
+  }
+
+  if (!state.presentationLock || state.presentationLock.transition !== "combat-exit") {
+    return false;
+  }
+
+  if ((performance.now() - state.presentationLock.startedAt) > COMBAT_EXIT_LOCK_MS) {
+    state.presentationLock = null;
+    if (state.viewportTransition === "combat-exit") {
+      state.viewportTransition = "none";
+    }
+    return false;
+  }
+
+  return true;
 }
 
 function nextSequence(state: AppState): number {
@@ -599,6 +755,7 @@ async function runQuestDecision(options: ControllerOptions, questId: string, act
       method: "POST",
       body: JSON.stringify({ run_id: state.runId }),
     });
+    syncExplorationOverlays(state, snapshot);
     state.snapshot = snapshot;
     if (snapshot.dialogue) {
       appendThreadMessage(state, snapshot.dialogue.npc_id, {
@@ -615,5 +772,55 @@ async function runQuestDecision(options: ControllerOptions, questId: string, act
   } finally {
     state.busy = false;
     syncBusyState(ui, state);
+  }
+}
+
+function toggleExplorationOverlay(state: AppState, overlay: "journal" | "map" | "inventory"): void {
+  if (state.snapshot?.in_combat) {
+    return;
+  }
+
+  const nextOpen = overlay === "journal"
+    ? !state.journalOpen
+    : overlay === "map"
+      ? !state.mapOpen
+      : !state.inventoryOpen;
+
+  closeExplorationOverlays(state);
+
+  if (!nextOpen) {
+    return;
+  }
+
+  if (overlay === "journal") {
+    state.journalOpen = true;
+  } else if (overlay === "map") {
+    state.mapOpen = true;
+  } else {
+    state.inventoryOpen = true;
+  }
+}
+
+function closeExplorationOverlays(state: AppState): void {
+  state.journalOpen = false;
+  state.mapOpen = false;
+  state.inventoryOpen = false;
+  state.dialogueOpen = false;
+}
+
+function syncExplorationOverlays(state: AppState, snapshot: Snapshot): void {
+  if (snapshot.in_combat || snapshot.run_result) {
+    closeExplorationOverlays(state);
+  }
+}
+
+function toggleDialogueDrawer(state: AppState): void {
+  if (!state.runId || state.snapshot?.in_combat || state.snapshot?.run_result) {
+    return;
+  }
+
+  state.dialogueOpen = !state.dialogueOpen;
+  if (!state.dialogueOpen && state.selectedNpcId) {
+    state.selectedNpcId = "";
   }
 }

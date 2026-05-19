@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS dungeon_floors (
   exits_json TEXT NOT NULL,
   entry_x INTEGER NOT NULL,
   entry_y INTEGER NOT NULL,
+  procgen_features_json TEXT NOT NULL DEFAULT '[]',
+  generation_json TEXT NOT NULL DEFAULT '{}',
   validation_json TEXT NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,

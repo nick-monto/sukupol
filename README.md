@@ -38,6 +38,14 @@ Sukupol is a browser-based ASCII rogue-lite with map-based traversal, an overwor
 
 ## Local development
 
+### Full stack
+
+```bash
+./launch-dev.sh
+```
+
+The root launcher bootstraps both app halves for local development: it installs `apps/web` dependencies on first run, creates `services/game-api/.venv` if needed, installs backend dependencies, starts the API on port `8000`, and starts the Vite client on port `5173`. Stop both with `Ctrl+C`.
+
 ### Backend
 
 ```bash
@@ -53,12 +61,12 @@ The backend listens on `http://127.0.0.1:8000` by default and will create `servi
 ### Frontend
 
 ```bash
-cd apps/web
-npm install
-npm run dev
+./launch-web.sh
 ```
 
 The web client expects the API at `http://127.0.0.1:8000`. Override it with `VITE_API_BASE` if needed.
+
+`./launch-web.sh` is kept as a compatibility wrapper and now delegates to the full-stack launcher above.
 
 ## Dialogue integration seam
 

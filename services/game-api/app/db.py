@@ -32,9 +32,20 @@ def initialize_database(world: WorldContent, db_path: Path | None = None) -> Non
     with connect(db_path) as connection:
         for schema_path in sorted(SCHEMA_DIR.glob("*.sql")):
             connection.executescript(schema_path.read_text(encoding="utf-8"))
+        ensure_dungeon_floor_schema(connection)
         seed_npc_content(connection, world)
         seed_gameplay_content(connection, world)
         connection.commit()
+
+
+def ensure_dungeon_floor_schema(connection: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in connection.execute("PRAGMA table_info(dungeon_floors)").fetchall()}
+    if not columns:
+        return
+    if "procgen_features_json" not in columns:
+        connection.execute("ALTER TABLE dungeon_floors ADD COLUMN procgen_features_json TEXT NOT NULL DEFAULT '[]'")
+    if "generation_json" not in columns:
+        connection.execute("ALTER TABLE dungeon_floors ADD COLUMN generation_json TEXT NOT NULL DEFAULT '{}'")
 
 
 def seed_npc_content(connection: sqlite3.Connection, world: WorldContent) -> None:
@@ -336,6 +347,8 @@ def persist_dungeon_floor(
     exits: list[dict],
     entry_x: int,
     entry_y: int,
+    procgen_features: list[dict],
+    generation: dict,
     validation: dict,
     db_path: Path | None = None,
 ) -> None:
@@ -355,10 +368,12 @@ def persist_dungeon_floor(
               exits_json,
               entry_x,
               entry_y,
+                            procgen_features_json,
+                            generation_json,
               validation_json,
               created_at,
               updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(location_id) DO UPDATE SET
               ascii_map_json = excluded.ascii_map_json,
               exits_json = excluded.exits_json,
@@ -366,6 +381,8 @@ def persist_dungeon_floor(
               description = excluded.description,
               entry_x = excluded.entry_x,
               entry_y = excluded.entry_y,
+                            procgen_features_json = excluded.procgen_features_json,
+                            generation_json = excluded.generation_json,
               validation_json = excluded.validation_json,
               updated_at = excluded.updated_at
             """,
@@ -382,6 +399,8 @@ def persist_dungeon_floor(
                 json.dumps(exits),
                 entry_x,
                 entry_y,
+                json.dumps(procgen_features, sort_keys=True),
+                json.dumps(generation, sort_keys=True),
                 json.dumps(validation, sort_keys=True),
                 utc_now(),
                 utc_now(),
@@ -395,7 +414,8 @@ def load_dungeon_floor(location_id: str, db_path: Path | None = None) -> dict | 
         row = connection.execute(
             """
             SELECT biome_id, floor_number, floor_seed, location_id, name, description,
-                   ascii_map_json, exits_json, entry_x, entry_y, validation_json
+                 ascii_map_json, exits_json, entry_x, entry_y,
+                 procgen_features_json, generation_json, validation_json
             FROM dungeon_floors
             WHERE location_id = ?
             """,
@@ -412,10 +432,16 @@ def load_dungeon_floor(location_id: str, db_path: Path | None = None) -> dict | 
         "ascii_map": json.loads(row["ascii_map_json"]),
         "exits": json.loads(row["exits_json"]),
         "biome_id": row["biome_id"],
+        "encounter_biome_id": row["biome_id"],
+        "encounter_enabled": True,
+        "encounter_floor": row["floor_number"],
         "floor_number": row["floor_number"],
+        "location_type": "dungeon",
         "floor_seed": row["floor_seed"],
         "entry_x": row["entry_x"],
         "entry_y": row["entry_y"],
+        "procgen_features": json.loads(row["procgen_features_json"]),
+        "procgen_generation": json.loads(row["generation_json"]),
         "validation": json.loads(row["validation_json"]),
     }
 

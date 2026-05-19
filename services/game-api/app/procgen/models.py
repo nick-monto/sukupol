@@ -27,4 +27,6 @@ class FloorLayout:
     exits: list[dict]
     entry_x: int
     entry_y: int
+    features: list[dict]
+    generation: dict
     validation: dict

@@ -218,12 +218,30 @@
       "name": "Ancient Halls",
       "description": "A narrow proving floor of cracked flags and listening dark.",
       "procgen_version": "v1",
+      "generation_profile": "halls",
       "floor_width": 19,
       "floor_height": 19,
       "max_rooms": 6,
       "room_min_size": 3,
       "room_max_size": 5,
       "encounter_rate": 28,
+      "generation_settings": {
+        "connection_window": 4,
+        "branch_chance": 0.42,
+        "extra_loops": 2,
+        "base_landmarks": 2,
+        "base_hazards": 2
+      },
+      "depth_progression": {
+        "room_growth_every": 2,
+        "max_room_bonus": 2,
+        "loop_growth_every": 2,
+        "max_loop_bonus": 2,
+        "hazard_growth_every": 2,
+        "max_hazard_bonus": 2,
+        "landmark_growth_every": 3,
+        "max_landmark_bonus": 1
+      },
       "return_message": "You climb back toward the approach, carrying the echo of the halls with you.",
       "return_exit": {
         "target_location_id": "dungeon_approach",
@@ -247,6 +265,50 @@
         "blind alcoves",
         "funeral braziers",
         "dust-heavy transepts"
+      ],
+      "landmark_types": [
+        {
+          "kind": "shrine",
+          "variant": "dust",
+          "detail": "A soot-dark shrine recess survives in the stonework.",
+          "weight": 3,
+          "radius": 1,
+          "tags": ["ritual", "stone"]
+        },
+        {
+          "kind": "memorial_alcove",
+          "variant": "dust",
+          "detail": "An alcove lined with names worn nearly smooth.",
+          "weight": 2,
+          "radius": 1,
+          "tags": ["memorial"]
+        },
+        {
+          "kind": "watch_post",
+          "variant": "moss",
+          "detail": "A raised watch post overlooks a narrow crossing.",
+          "weight": 1,
+          "radius": 0,
+          "tags": ["defense"]
+        }
+      ],
+      "hazard_types": [
+        {
+          "kind": "collapse",
+          "variant": "rubble",
+          "detail": "The ceiling has sloughed stone into the passage.",
+          "weight": 3,
+          "radius": 1,
+          "tags": ["obstruction"]
+        },
+        {
+          "kind": "chokepoint",
+          "variant": "rubble",
+          "detail": "The hall narrows into a defensive choke.",
+          "weight": 2,
+          "radius": 0,
+          "tags": ["pressure"]
+        }
       ]
     },
     {
@@ -254,12 +316,32 @@
       "name": "Sunken Archive",
       "description": "A drowned repository of stone shelves, warped ledgers, and patient things moving through the seep.",
       "procgen_version": "v1",
+      "generation_profile": "flooded_archive",
       "floor_width": 23,
       "floor_height": 17,
       "max_rooms": 7,
       "room_min_size": 3,
       "room_max_size": 6,
       "encounter_rate": 30,
+      "generation_settings": {
+        "connection_window": 5,
+        "branch_chance": 0.58,
+        "extra_loops": 3,
+        "base_landmarks": 2,
+        "base_hazards": 3
+      },
+      "depth_progression": {
+        "room_growth_every": 2,
+        "max_room_bonus": 2,
+        "loop_growth_every": 2,
+        "max_loop_bonus": 3,
+        "hazard_growth_every": 2,
+        "max_hazard_bonus": 3,
+        "landmark_growth_every": 3,
+        "max_landmark_bonus": 2,
+        "width_growth_every": 3,
+        "max_width_bonus": 2
+      },
       "return_message": "You wade back up the flooded stair and return to the whispering cave.",
       "return_exit": {
         "target_location_id": "whispering_cave",
@@ -283,6 +365,50 @@
         "split reading desks",
         "silt-choked index alcoves",
         "chains of warped tablets"
+      ],
+      "landmark_types": [
+        {
+          "kind": "archive_nexus",
+          "variant": "moss",
+          "detail": "A central index plinth still gathers the room around it.",
+          "weight": 2,
+          "radius": 1,
+          "tags": ["archive", "navigation"]
+        },
+        {
+          "kind": "silt_cache",
+          "variant": "dust",
+          "detail": "A sealed cache rests above the black waterline.",
+          "weight": 2,
+          "radius": 0,
+          "tags": ["cache"]
+        },
+        {
+          "kind": "quiet_room",
+          "variant": "dust",
+          "detail": "A reading room still holds a pocket of hush.",
+          "weight": 1,
+          "radius": 1,
+          "tags": ["quiet"]
+        }
+      ],
+      "hazard_types": [
+        {
+          "kind": "flooded_room",
+          "variant": "wet",
+          "detail": "Dark water has pooled deep across this chamber.",
+          "weight": 3,
+          "radius": 1,
+          "tags": ["water"]
+        },
+        {
+          "kind": "seep",
+          "variant": "wet",
+          "detail": "Cold seep runs between the stone joints here.",
+          "weight": 2,
+          "radius": 0,
+          "tags": ["water", "erosion"]
+        }
       ]
     }
   ],
@@ -433,6 +559,33 @@
       "max_hp": 6,
       "damage": 2,
       "defence": 0,
+      "communication_mode": "speech",
+      "negotiation": {
+        "can_negotiate": false,
+        "temperament": "resentful",
+        "reason_blocked": "It remembers an oath older than you and hears every plea as trespass."
+      },
+      "pinball": {
+        "accent": "Oath-bound gatework",
+        "damage_node_count": 3,
+        "converse_node_count": 1,
+        "unique_obstacles": [
+          {
+            "kind": "osseous_gate",
+            "label": "Osseous Gate",
+            "effect": "armor_shave",
+            "value": 1,
+            "detail": "A rib-latched gate that cracks the warden's defense when struck."
+          },
+          {
+            "kind": "oath_bell",
+            "label": "Oath Bell",
+            "effect": "combo_boost",
+            "value": 1,
+            "detail": "A tolling bell that sharpens the table's rhythm."
+          }
+        ]
+      },
       "gold_drop": [3, 5],
       "description": "A rattling guard that still remembers its post.",
       "loot_table": [
@@ -455,6 +608,24 @@
       "max_hp": 8,
       "damage": 3,
       "defence": 1,
+      "pinball": {
+        "accent": "Heavy ward geometry",
+        "damage_node_count": 3,
+        "unique_obstacles": [
+          {
+            "kind": "shield_arch",
+            "label": "Shield Arch",
+            "effect": "brace",
+            "value": 1
+          },
+          {
+            "kind": "sentinel_eye",
+            "label": "Sentinel Eye",
+            "effect": "armor_shave",
+            "value": 1
+          }
+        ]
+      },
       "gold_drop": [4, 6],
       "description": "A heavier guardian of the first descent.",
       "loot_table": [
@@ -477,6 +648,24 @@
       "max_hp": 5,
       "damage": 3,
       "defence": 0,
+      "pinball": {
+        "accent": "Lunging side lanes",
+        "damage_node_count": 2,
+        "unique_obstacles": [
+          {
+            "kind": "hound_leap",
+            "label": "Hound Leap",
+            "effect": "combo_boost",
+            "value": 1
+          },
+          {
+            "kind": "fang_rail",
+            "label": "Fang Rail",
+            "effect": "armor_shave",
+            "value": 1
+          }
+        ]
+      },
       "gold_drop": [2, 4],
       "description": "A lean scavenger that learned to hunt where the dead are stacked.",
       "loot_table": [
@@ -499,6 +688,35 @@
       "max_hp": 7,
       "damage": 2,
       "defence": 1,
+      "communication_mode": "telepathy",
+      "negotiation": {
+        "can_negotiate": true,
+        "temperament": "wary",
+        "difficulty": 4,
+        "anger_limit": 2,
+        "outcomes": ["tribute", "retreat"],
+        "tribute_item_id": "health_potion",
+        "tribute_quantity": 1
+      },
+      "pinball": {
+        "accent": "Lantern relays",
+        "damage_node_count": 3,
+        "converse_node_count": 2,
+        "unique_obstacles": [
+          {
+            "kind": "moss_relay",
+            "label": "Moss Relay",
+            "effect": "combo_boost",
+            "value": 1
+          },
+          {
+            "kind": "bronze_lantern",
+            "label": "Bronze Lantern",
+            "effect": "brace",
+            "value": 1
+          }
+        ]
+      },
       "gold_drop": [3, 5],
       "description": "A damp shrine-light with a frame of bone and bronze.",
       "loot_table": [
@@ -521,6 +739,36 @@
       "max_hp": 6,
       "damage": 3,
       "defence": 0,
+      "communication_mode": "telepathy",
+      "negotiation": {
+        "can_negotiate": true,
+        "temperament": "wary",
+        "difficulty": 5,
+        "anger_limit": 3,
+        "outcomes": ["recruit", "tribute", "retreat"],
+        "ally_battles": 2,
+        "tribute_item_id": "brine_balm",
+        "tribute_quantity": 1
+      },
+      "pinball": {
+        "accent": "Drowned ledger rails",
+        "damage_node_count": 4,
+        "converse_node_count": 2,
+        "unique_obstacles": [
+          {
+            "kind": "ledger_rack",
+            "label": "Ledger Rack",
+            "effect": "armor_shave",
+            "value": 1
+          },
+          {
+            "kind": "ink_siphon",
+            "label": "Ink Siphon",
+            "effect": "combo_boost",
+            "value": 1
+          }
+        ]
+      },
       "gold_drop": [4, 7],
       "description": "A soaked archivist-shade that still reaches for names worth dragging under.",
       "loot_table": [
@@ -543,6 +791,24 @@
       "max_hp": 4,
       "damage": 2,
       "defence": 0,
+      "pinball": {
+        "accent": "Leeching gutters",
+        "damage_node_count": 2,
+        "unique_obstacles": [
+          {
+            "kind": "silt_gutter",
+            "label": "Silt Gutter",
+            "effect": "brace",
+            "value": 1
+          },
+          {
+            "kind": "ledger_pocket",
+            "label": "Ledger Pocket",
+            "effect": "combo_boost",
+            "value": 1
+          }
+        ]
+      },
       "gold_drop": [2, 4],
       "description": "A fat cave parasite slick with ink-black seep and attracted to warm blood.",
       "loot_table": [
@@ -565,6 +831,31 @@
       "max_hp": 9,
       "damage": 4,
       "defence": 1,
+      "communication_mode": "speech",
+      "negotiation": {
+        "can_negotiate": false,
+        "temperament": "irate",
+        "reason_blocked": "It can shape words, but hunger drives every thought now."
+      },
+      "pinball": {
+        "accent": "Silt jaws and false reliquaries",
+        "damage_node_count": 3,
+        "converse_node_count": 1,
+        "unique_obstacles": [
+          {
+            "kind": "silt_jaw",
+            "label": "Silt Jaw",
+            "effect": "armor_shave",
+            "value": 2
+          },
+          {
+            "kind": "false_reliquary",
+            "label": "False Reliquary",
+            "effect": "combo_boost",
+            "value": 1
+          }
+        ]
+      },
       "gold_drop": [5, 8],
       "description": "A sediment-caked thing that learned the shape of a reliquary before it learned hunger.",
       "loot_table": [

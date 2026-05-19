@@ -1,5 +1,5 @@
 import { hideMap, renderMap } from "./viewport";
-import type { AppState, CombatPartySlot, DialogueMessage, OverworldMap, Snapshot } from "./types";
+import type { AppState, CombatNegotiationEntry, CombatPartySlot, DialogueMessage, OverworldMap, Snapshot } from "./types";
 import type { UiElements } from "./ui";
 
 const transitionTimers = new WeakMap<HTMLElement, number>();
@@ -55,18 +55,8 @@ export function renderApp(
   ui.npcList.innerHTML = renderNpcList(snapshot, state.selectedNpcId);
   ui.questChoicePanel.innerHTML = renderQuestChoicePanel(snapshot, state.selectedNpcId);
   ui.combatOverlay.hidden = !snapshot.in_combat || !snapshot.combat_state;
-  ui.combatOverlay.innerHTML = snapshot.in_combat && snapshot.combat_state ? renderCombatOverlay(snapshot) : "";
+  applyCombatOverlayUpdate(ui.combatOverlay, snapshot);
   ui.combatActions.innerHTML = snapshot.in_combat && snapshot.combat_state ? renderCombatActions(snapshot) : "";
-
-  if (snapshot.in_combat && snapshot.combat_state) {
-    ui.logTitle.textContent = `Round ${snapshot.combat_state.round}`;
-    ui.logHelp.textContent = "Recent exchanges";
-  } else {
-    ui.logTitle.textContent = state.selectedNpcId ? "Dialogue" : "Dispatch";
-    ui.logHelp.textContent = state.selectedNpcId
-      ? "A contact is tuned in. This channel is reserved for NPC conversation."
-      : "No contact selected. Choose a nearby voice to open a conversation.";
-  }
 
   ui.dialogueLog.innerHTML = renderUnifiedTranscript(snapshot, state);
 
@@ -79,6 +69,13 @@ export function renderApp(
 }
 
 function applyPresentationState(ui: UiElements, state: AppState, snapshot: Snapshot | null): void {
+  const combatParleyActive = snapshot?.in_combat && snapshot.combat_state?.negotiation?.active;
+  const combatVisible = snapshot?.in_combat === true;
+  const archived = snapshot?.run_result != null;
+  const launchVisible = !snapshot || archived;
+  const dialogueVisible = !!snapshot && !combatVisible && !archived
+    && (state.dialogueOpen || state.selectedNpcId !== "");
+  const contextVisible = combatVisible || dialogueVisible;
   const shellMode = !snapshot ? "idle" : snapshot.run_result ? "archived" : snapshot.in_combat ? "combat" : "exploration";
   const contextMode = !snapshot
     ? "idle"
@@ -89,53 +86,57 @@ function applyPresentationState(ui: UiElements, state: AppState, snapshot: Snaps
         : state.selectedNpcId
           ? "dialogue"
           : "idle";
-  const actionMode = !snapshot ? "idle" : snapshot.run_result ? "archived" : snapshot.in_combat ? "combat" : state.selectedNpcId ? "dialogue-ready" : "idle";
+  const actionMode = !snapshot
+    ? "idle"
+    : snapshot.run_result
+      ? "archived"
+      : snapshot.in_combat
+        ? combatParleyActive ? "combat-parley" : "combat"
+        : state.selectedNpcId
+          ? "dialogue-ready"
+          : "idle";
 
   setMode(ui.shell, shellMode);
   setMode(ui.contextDrawer, contextMode);
   setMode(ui.actionPanel, actionMode);
   setMode(ui.outcomePanel, snapshot?.run_result ? "archived" : "idle");
   setMode(ui.viewportPanel, snapshot?.in_combat ? "combat" : snapshot?.run_result ? "archived" : snapshot ? "exploration" : "idle");
-  setMode(ui.logPanel, snapshot?.in_combat ? "combat" : state.selectedNpcId ? "tuned" : "idle");
+  ui.launchPanel.hidden = combatVisible || !launchVisible;
+  ui.topHud.hidden = combatVisible || launchVisible;
+  ui.bottomHud.hidden = combatVisible || launchVisible;
+  ui.contextDrawer.hidden = launchVisible || archived || !contextVisible;
+  ui.journalPanel.hidden = launchVisible || combatVisible || !state.journalOpen;
+  ui.mapPanel.hidden = launchVisible || combatVisible || !state.mapOpen || !snapshot || archived;
+  ui.inventoryPanel.hidden = launchVisible || archived || !snapshot || (!combatVisible && !state.inventoryOpen);
+  ui.shell.classList.toggle("is-journal-open", state.journalOpen && !combatVisible);
+  ui.shell.classList.toggle("is-map-open", state.mapOpen && !combatVisible);
+  ui.shell.classList.toggle("is-inventory-open", state.inventoryOpen && !combatVisible);
+  ui.shell.classList.toggle("is-dialogue-open", state.dialogueOpen && !combatVisible);
+  ui.journalToggleButton.setAttribute("aria-pressed", state.journalOpen ? "true" : "false");
+  ui.mapToggleButton.setAttribute("aria-pressed", state.mapOpen ? "true" : "false");
+  ui.inventoryToggleButton.setAttribute("aria-pressed", state.inventoryOpen ? "true" : "false");
+  ui.dialogueToggleButton.setAttribute("aria-pressed", state.dialogueOpen ? "true" : "false");
   ui.playerMessage.placeholder = getMessagePlaceholder(snapshot, state.selectedNpcId);
+  ui.sendMessageButton.textContent = combatParleyActive ? "Send" : "Send";
 
   if (!snapshot) {
-    ui.dispatchKicker.textContent = "Dispatch";
-    ui.dispatchTitle.textContent = "Field Orders";
-    ui.dispatchNote.textContent = "Select a contact to transmit. Combat orders appear here during encounters.";
+    ui.launchMessage.textContent = "Enter your name and begin a run from the center portal.";
     ui.outcomeTitle.textContent = "Run Chronicle";
     ui.outcomeNote.textContent = "Resolved runs and the running journal of NPC visits.";
     return;
   }
 
   if (snapshot.run_result) {
-    ui.dispatchKicker.textContent = "Stand Down";
-    ui.dispatchTitle.textContent = "Expedition Closed";
-    ui.dispatchNote.textContent = "This run is closed. Review the chronicle, then begin again from town.";
+    ui.launchMessage.textContent = "Your last expedition is archived. Enter a name to launch a new run.";
     ui.outcomeTitle.textContent = "Archived Chronicle";
     ui.outcomeNote.textContent = "Final record from the last completed expedition alongside your NPC journal.";
     return;
   }
 
   if (snapshot.in_combat) {
-    const enemyName = snapshot.combat_state?.enemy.name ?? "enemy";
-    ui.dispatchKicker.textContent = "Combat";
-    ui.dispatchTitle.textContent = enemyName;
-    ui.dispatchNote.textContent = "Choose an action or break away.";
     ui.outcomeTitle.textContent = "Run Chronicle";
     ui.outcomeNote.textContent = "Resolved runs and the running journal of NPC visits.";
     return;
-  }
-
-  if (state.selectedNpcId) {
-    const npcName = snapshot.nearby_npcs.find((npc) => npc.id === state.selectedNpcId)?.display_name ?? "selected contact";
-    ui.dispatchKicker.textContent = "Dialogue";
-    ui.dispatchTitle.textContent = `Signal ${npcName}`;
-    ui.dispatchNote.textContent = "A contact is tuned in. Ask for rumor, guidance, or supplies.";
-  } else {
-    ui.dispatchKicker.textContent = "Dispatch";
-    ui.dispatchTitle.textContent = "Field Orders";
-    ui.dispatchNote.textContent = "Move, survey the slate, or choose a nearby voice before transmitting.";
   }
 
   ui.outcomeTitle.textContent = "Run Chronicle";
@@ -159,9 +160,13 @@ function setMode(element: HTMLElement, nextMode: string): void {
   const previousMode = element.dataset.mode;
   element.dataset.mode = nextMode;
 
-  if (previousMode && previousMode !== nextMode) {
+  if (previousMode && previousMode !== nextMode && !shouldSuppressModeTransition(previousMode, nextMode)) {
     triggerModeTransition(element);
   }
+}
+
+function shouldSuppressModeTransition(previousMode: string, nextMode: string): boolean {
+  return previousMode.includes("combat") || nextMode.includes("combat");
 }
 
 function triggerModeTransition(element: HTMLElement): void {
@@ -188,7 +193,10 @@ function getMessagePlaceholder(snapshot: Snapshot | null, selectedNpcId: string)
   }
 
   if (snapshot.in_combat) {
-    return "Combat is active. Use the combat orders instead.";
+    if (snapshot.combat_state?.negotiation?.active) {
+      return "Send terms, warning, apology, or threat. Shift+Enter for a line break.";
+    }
+    return "Combat is active. Use the combat orders or open communications first.";
   }
 
   if (selectedNpcId) {
@@ -407,37 +415,27 @@ function renderNpcList(snapshot: Snapshot, selectedNpcId: string): string {
   }
 
   return `
-    <div class="panel-header panel-header-compact">
-      <div>
-        <p class="eyebrow">Contacts</p>
-        <h3>Nearby voices</h3>
-      </div>
-    </div>
-    ${snapshot.nearby_npcs
+    <div class="npc-roster">
+      ${snapshot.nearby_npcs
       .map((npc) => {
         const selected = npc.id === selectedNpcId;
-        const asciiArt = npc.ascii_art.length > 0
-          ? `<pre class="entity-ascii" aria-hidden="true">${escapeHtml(npc.ascii_art.join("\n"))}</pre>`
-          : "";
         return `
-          <div class="npc-item${selected ? " is-selected" : ""}">
-            ${asciiArt}
-            <div class="npc-item-copy">
-              <strong>${npc.display_name}</strong>
-              <div class="small">${npc.role} / ${npc.distance === 0 ? "within speaking distance" : "one step away"}</div>
-            </div>
-            <button data-npc-id="${npc.id}" ${selected ? "disabled" : ""}>
-              ${selected ? "Listening" : "Tune in"}
-            </button>
-          </div>
+          <button class="npc-tab${selected ? " is-selected" : ""}" data-npc-id="${npc.id}" ${selected ? "disabled" : ""}>
+            <span class="npc-tab-name">${escapeHtml(npc.display_name)}</span>
+            <span class="npc-tab-meta">${escapeHtml(npc.distance === 0 ? "In range" : "One step away")}</span>
+          </button>
         `;
       })
       .join("")}
+    </div>
   `;
 }
 
 function renderUnifiedTranscript(snapshot: Snapshot | null, state: AppState): string {
   if (snapshot?.in_combat && snapshot.combat_state) {
+    if (snapshot.combat_state.negotiation?.active) {
+      return renderCombatCommunicationTranscript(snapshot.combat_state);
+    }
     return renderCombatDispatch(snapshot);
   }
 
@@ -449,7 +447,7 @@ function renderUnifiedTranscript(snapshot: Snapshot | null, state: AppState): st
     );
   }
 
-  return renderDialogueTranscript(snapshot, state);
+  return renderDialogueTranscript(snapshot!, state);
 }
 
 function escapeHtml(value: string): string {
@@ -489,7 +487,7 @@ function renderCombatDispatch(snapshot: Snapshot): string {
   const entries: DialogueMessage[] = combatState.events.map((event, index) => ({
     id: event.id,
     sequence: index,
-    speaker: event.actor === "player" ? "player" : event.actor === "enemy" ? "npc" : "system",
+    speaker: event.actor === "player" ? "player" : event.actor === "enemy" ? "npc" : event.actor === "ally" ? "ally" : "system",
     npcName: combatState.enemy.name,
     text: event.text,
   }));
@@ -509,51 +507,212 @@ function renderCombatDispatch(snapshot: Snapshot): string {
   return entries.map(renderChatMessage).join("");
 }
 
+function renderCombatCommunicationTranscript(combatState: NonNullable<Snapshot["combat_state"]>): string {
+  const transcript = combatState.negotiation?.transcript ?? [];
+  if (transcript.length === 0) {
+    return renderChatEmpty("Communication line is open. Send the first message to begin talking to the enemy.");
+  }
+
+  const entries: DialogueMessage[] = transcript.map((entry, index) => ({
+    id: `combat-negotiation-${index}`,
+    sequence: index,
+    speaker: entry.speaker === "enemy" ? "npc" : entry.speaker,
+    npcName: combatState.enemy.name,
+    text: entry.text,
+  }));
+
+  return entries.map(renderChatMessage).join("");
+}
+
+// ---------------------------------------------------------------------------
+// Combat overlay — smart update (preserves pinball canvas on re-renders)
+// ---------------------------------------------------------------------------
+
+export function applyCombatOverlayUpdate(el: HTMLDivElement, snapshot: Snapshot): void {
+  const inCombat = !!(snapshot.in_combat && snapshot.combat_state);
+
+  if (!inCombat) {
+    el.innerHTML = "";
+    return;
+  }
+
+  // If the canvas already exists, only refresh the mutable sidecard + strip.
+  // This keeps the live pinball simulation in place across snapshot updates.
+  const existingCanvas = el.querySelector<HTMLCanvasElement>("#pinball-cabinet-canvas");
+  if (existingCanvas) {
+    const sidecard = el.querySelector<HTMLElement>("#combat-sidecard");
+    if (sidecard) sidecard.innerHTML = renderCombatSidecardContent(snapshot);
+    const strip = el.querySelector<HTMLElement>("#combat-inventory-strip");
+    if (strip) strip.innerHTML = renderCombatInventoryStripContent(snapshot);
+    return;
+  }
+
+  // First paint: full layout
+  el.innerHTML = renderCombatOverlay(snapshot);
+}
+
 function renderCombatOverlay(snapshot: Snapshot): string {
   const combatState = snapshot.combat_state;
-  if (!combatState) {
-    return "";
-  }
+  if (!combatState) return "";
+
+  return `
+    <div class="combat-overlay-shell">
+      <div class="combat-overlay-stage">
+        <div class="combat-pinball-cabinet">
+          <canvas id="pinball-cabinet-canvas" aria-label="Pinball combat cabinet"></canvas>
+        </div>
+        <div class="combat-cabinet-sidecard" id="combat-sidecard">
+          ${renderCombatSidecardContent(snapshot)}
+        </div>
+      </div>
+      <div class="combat-inventory-strip" id="combat-inventory-strip">
+        ${renderCombatInventoryStripContent(snapshot)}
+      </div>
+    </div>
+  `;
+}
+
+function renderCombatSidecardContent(snapshot: Snapshot): string {
+  const combatState = snapshot.combat_state;
+  if (!combatState) return "";
 
   const asciiArt = combatState.enemy.presentation.ascii_art;
   const enemyArt = asciiArt.length > 0
     ? `<pre class="combat-overlay-art" aria-hidden="true">${escapeHtml(asciiArt.join("\n"))}</pre>`
     : `<div class="combat-overlay-sigil" aria-hidden="true">${escapeHtml(combatState.enemy.name.slice(0, 1).toUpperCase())}</div>`;
 
+  const player = combatState.party.find((s) => s.is_player);
+  const playerHp    = player ? player.hp    : 0;
+  const playerMaxHp = player ? player.max_hp : 0;
+  const playerHpPct = playerMaxHp > 0 ? Math.max(0, Math.min(100, (playerHp / playerMaxHp) * 100)) : 0;
+  const enemyHpPct  = combatState.enemy.max_hp > 0
+    ? Math.max(0, Math.min(100, (combatState.enemy.hp / combatState.enemy.max_hp) * 100))
+    : 0;
+
+  const log = renderCombatSidecardLog(snapshot);
+  const negotiation = combatState.negotiation ? renderNegotiationCard(combatState) : "";
+
   return `
-    <div class="combat-overlay-shell">
-      <div class="combat-overlay-header">
+    <div class="combat-cabinet-sidecard-head">
+      <h3>${escapeHtml(combatState.enemy.name)}</h3>
+      <span class="combat-stat-pill">Round ${combatState.round}</span>
+    </div>
+    <div class="combat-cabinet-monster-panel">
+      ${enemyArt}
+    </div>
+    <div class="combat-cabinet-hp-grid">
+      <div class="combat-cabinet-hp-card is-enemy">
+        <span class="combat-enemy-label">Monster</span>
+        <strong>${combatState.enemy.hp}<span class="combat-hp-sep">/</span>${combatState.enemy.max_hp}</strong>
+        <div class="combat-hp-bar"><div class="combat-hp-bar-fill is-enemy" style="width:${enemyHpPct}%"></div></div>
+      </div>
+      <div class="combat-cabinet-hp-card is-player">
+        <span class="combat-enemy-label">You</span>
+        <strong>${playerHp}<span class="combat-hp-sep">/</span>${playerMaxHp}</strong>
+        <div class="combat-hp-bar"><div class="combat-hp-bar-fill is-player" style="width:${playerHpPct}%"></div></div>
+      </div>
+    </div>
+    ${negotiation}
+    <div class="combat-sidecard-log">
+      ${log}
+    </div>
+  `;
+}
+
+function renderCombatSidecardLog(snapshot: Snapshot): string {
+  const combatState = snapshot.combat_state;
+  if (!combatState) return "";
+
+  const events = combatState.events;
+  if (events.length === 0) {
+    return `<p class="small combat-log-empty">Combat started. Launch the ball to attack.</p>`;
+  }
+
+  return events
+    .slice(-10)
+    .map((event) => {
+      const cls = `combat-log-entry is-${event.actor} is-${event.emphasis}`;
+      return `<div class="${cls}">${renderChatText(event.text)}</div>`;
+    })
+    .join("");
+}
+
+function renderCombatInventoryStripContent(snapshot: Snapshot): string {
+  const weapons = snapshot.inventory.filter((item) =>
+    item.item_type === "weapon" || item.item_type === "armor" || item.equipped,
+  );
+
+  if (weapons.length === 0) {
+    return `<span class="combat-inventory-empty small">No items equipped.</span>`;
+  }
+
+  return weapons
+    .map((item) => {
+      const isEquipped = item.equipped || item.item_id === snapshot.equipped_weapon;
+      return `
+        <div class="combat-inventory-item${isEquipped ? " is-equipped" : ""}"
+             title="${escapeHtml(item.description)}">
+          <span class="combat-inventory-item-name">${escapeHtml(item.name)}</span>
+          <span class="combat-inventory-item-type">${escapeHtml(item.item_type)}</span>
+          ${isEquipped ? '<span class="combat-inventory-item-badge">equipped</span>' : ""}
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderNegotiationCard(combatState: Snapshot["combat_state"]): string {
+  if (!combatState?.negotiation) {
+    return "";
+  }
+
+  const negotiation = combatState.negotiation;
+  const options = negotiation.options.length > 0
+    ? negotiation.options.map((option) => `<span class="negotiation-option-pill">${escapeHtml(option.label)}</span>`).join("")
+    : '<span class="negotiation-option-pill is-muted">No terms</span>';
+  const transcript = negotiation.transcript.length > 0
+    ? negotiation.transcript.map(renderNegotiationEntry).join("")
+    : '<p class="small negotiation-empty">No terms have been offered yet.</p>';
+  const status = negotiation.locked
+    ? negotiation.lock_reason || "This mind is closed to reason."
+    : negotiation.active
+      ? "Communication is active. Press for a term or end the channel before the creature does."
+      : negotiation.available
+        ? `This foe can answer by ${escapeHtml(negotiation.communication_mode)}.`
+        : negotiation.lock_reason || "No opening for reason.";
+
+  return `
+    <aside class="negotiation-card${negotiation.locked ? " is-locked" : negotiation.active ? " is-active" : ""}">
+      <div class="negotiation-card-head">
         <div>
-          <p class="eyebrow">Combat state</p>
-          <h3>${escapeHtml(combatState.enemy.name)}</h3>
+          <span class="combat-enemy-label">Communications</span>
+          <strong>${escapeHtml(negotiation.communication_mode)}</strong>
         </div>
-        <div class="combat-overlay-readout">
-          <span class="combat-stat-pill">Round ${combatState.round}</span>
-          <span class="combat-stat-pill is-danger">${combatState.enemy.hp}/${combatState.enemy.max_hp} HP</span>
-        </div>
-      </div>
-      <div class="combat-overlay-stage">
-        <div class="combat-overlay-enemy-card">
-          <div class="combat-overlay-enemy-copy">
-            <span class="combat-enemy-label">Hostile contact</span>
-            <strong>${escapeHtml(combatState.enemy.name)}</strong>
-            <div class="combat-enemy-stats">
-              <span>ATK ${combatState.enemy.attack}</span>
-              <span>DEF ${combatState.enemy.defence}</span>
-            </div>
-          </div>
-          ${enemyArt}
+        <div class="negotiation-readout">
+          <span class="combat-stat-pill">${escapeHtml(negotiation.temperament)}</span>
+          <span class="combat-stat-pill">Leverage ${negotiation.leverage >= 0 ? `+${negotiation.leverage}` : negotiation.leverage}</span>
+          <span class="combat-stat-pill${negotiation.anger > 0 ? " is-danger" : ""}">Anger ${negotiation.anger}/${negotiation.anger_limit}</span>
         </div>
       </div>
-      <div class="combat-overlay-hud">
-        <div class="combat-overlay-hud-head">
-          <span class="combat-enemy-label">Party line</span>
-          <span class="small">Reserved slots stay visible so party members can drop in later.</span>
-        </div>
-        <div class="combat-party-grid">
-          ${combatState.party.map((slot) => renderCombatPartyCard(slot)).join("")}
-        </div>
-      </div>
+      <p class="small negotiation-copy">${status}</p>
+      ${negotiation.active_intent ? `<p class="small negotiation-copy">Current line: ${escapeHtml(negotiation.active_intent)}</p>` : ""}
+      <div class="negotiation-options">${options}</div>
+      <div class="negotiation-transcript">${transcript}</div>
+    </aside>
+  `;
+}
+
+function renderNegotiationEntry(entry: CombatNegotiationEntry): string {
+  const speaker = entry.speaker === "player"
+    ? "You"
+    : entry.speaker === "enemy"
+      ? "Foe"
+      : "System";
+
+  return `
+    <div class="negotiation-entry is-${entry.speaker}">
+      <span class="negotiation-speaker">${escapeHtml(speaker)}</span>
+      <span>${renderChatText(entry.text)}</span>
     </div>
   `;
 }
@@ -590,16 +749,24 @@ function renderCombatActions(snapshot: Snapshot): string {
   }
 
   return combatState.available_actions
-    .map((action) => `
+    .map((action) => {
+      const label = action.id === "parley_open"
+        ? "Communicate"
+        : action.id === "parley_end"
+          ? "End communication"
+          : action.label;
+
+      return `
       <button
         type="button"
         class="combat-action-button combat-action-${action.kind}"
         data-combat-action="${escapeHtml(action.id)}"
         ${action.enabled ? "" : "disabled"}
       >
-        ${escapeHtml(action.label)}
+        ${escapeHtml(label)}
       </button>
-    `)
+    `;
+    })
     .join("");
 }
 
@@ -662,6 +829,8 @@ function formatJournalStamp(value: string): string {
 function renderChatMessage(message: DialogueMessage): string {
   const speakerLabel = message.speaker === "player"
     ? "You"
+    : message.speaker === "ally"
+      ? "Ally"
     : message.speaker === "system"
       ? "System"
       : message.npcName ?? "Contact";

@@ -27,7 +27,6 @@ type ResolvedMapScene = {
 };
 
 const mapInstances = new WeakMap<HTMLDivElement, PixiMapInstance>();
-
 export function renderPixiMap(options: PixiMapRenderOptions): void {
   const { container, lines, metadata, transition, styles, onTransitionComplete } = options;
   const instance = getOrCreateMapInstance(container);
