@@ -619,7 +619,7 @@ button:focus-visible {
 .combat-pinball-cabinet canvas {
   display: block;
   height: 100%;
-  max-height: min(100%, 650px);
+  max-height: min(100%, 800px);
   width: auto;
   max-width: 100%;
   image-rendering: pixelated;

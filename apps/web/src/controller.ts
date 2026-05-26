@@ -4,6 +4,7 @@ import type { UiElements } from "./ui";
 import { isEditableTarget } from "./ui";
 import { setupPinball } from "./pinballCombat";
 import type { PinballTable } from "./pinballCombat";
+import { generatePinballTable } from "./pinballTable";
 
 type ControllerOptions = {
   apiBase: string;
@@ -34,14 +35,20 @@ function managePinballFn(options: ControllerOptions): void {
   if (inCombat && !activePinball) {
     const canvas = document.querySelector<HTMLCanvasElement>("#pinball-cabinet-canvas");
     if (!canvas) return;
+    const descriptor = state.snapshot?.combat_state?.pinball_descriptor ?? null;
+    const layout = generatePinballTable(descriptor ?? {
+      biome_id: "ashen_fields",
+      floor_seed: 0,
+      enemy_id: "unknown",
+      enemy_pinball: {},
+    });
     activePinball = setupPinball(canvas, {
+      layout,
       equippedWeaponType: getEquippedWeaponType(state.snapshot ?? null),
-      onBumperHit: (_bumperId: string, _multiplier: number) => {
-        void runCombatActionRequest(options, "attack");
+      onPinballStrike: (score: number) => {
+        if (score > 0) void runCombatActionRequest(options, `pinball_strike:${score}`);
       },
-      onBallDrain: () => {
-        void runCombatActionRequest(options, "attack");
-      },
+      onBallDrain: () => { /* score already handled via onPinballStrike at drain */ },
     });
     return;
   }

@@ -556,7 +556,7 @@
         " /|=|\\",
         "  d b  "
       ],
-      "max_hp": 6,
+      "max_hp": 120,
       "damage": 2,
       "defence": 0,
       "communication_mode": "speech",
@@ -605,7 +605,7 @@
         " /|_|\\",
         "  / \\  "
       ],
-      "max_hp": 8,
+      "max_hp": 220,
       "damage": 3,
       "defence": 1,
       "pinball": {
@@ -645,7 +645,7 @@
         " /| ^ |\\",
         "  /   \\"
       ],
-      "max_hp": 5,
+      "max_hp": 90,
       "damage": 3,
       "defence": 0,
       "pinball": {
@@ -685,7 +685,7 @@
         " /|..|\\",
         "  /__\\  "
       ],
-      "max_hp": 7,
+      "max_hp": 150,
       "damage": 2,
       "defence": 1,
       "communication_mode": "telepathy",
@@ -736,7 +736,7 @@
         " /|[]|\\",
         "  /__\\  "
       ],
-      "max_hp": 6,
+      "max_hp": 140,
       "damage": 3,
       "defence": 0,
       "communication_mode": "telepathy",
@@ -788,7 +788,7 @@
         " /|~~|\\",
         "  \\__/  "
       ],
-      "max_hp": 4,
+      "max_hp": 80,
       "damage": 2,
       "defence": 0,
       "pinball": {
@@ -828,7 +828,7 @@
         " /|##|\\",
         "  /__\\  "
       ],
-      "max_hp": 9,
+      "max_hp": 280,
       "damage": 4,
       "defence": 1,
       "communication_mode": "speech",

@@ -363,6 +363,18 @@ def create_combat_state(world: WorldContent, state: RunState, enemy_id: str, enc
         "enemy_defence": enemy.get("defence", 0),
     }
     combat_state["available_actions"] = build_available_actions(world, state, combat_state)
+
+    # Pinball descriptor — gives the client enough info to seed the table layout
+    location = world.locations.get(state.location_id, {}) if state.location_id else {}
+    biome_id = location.get("encounter_biome_id") or location.get("biome_id") or "ashen_fields"
+    floor_num = int(location.get("encounter_floor", location.get("floor_number", 0) or 0) or 0)
+    combat_state["pinball_descriptor"] = {
+        "biome_id": str(biome_id),
+        "floor_seed": (int(state.run_seed or 0) + floor_num * 10003) & 0xFFFFFFFF,
+        "enemy_id": enemy_id,
+        "enemy_pinball": enemy.get("pinball", {}),
+    }
+
     return combat_state
 
 
@@ -419,6 +431,9 @@ def normalize_combat_state(world: WorldContent, state: RunState) -> dict[str, An
         "enemy_defence": int((enemy_payload or {}).get("defence", raw_state.get("enemy_defence", enemy_def.get("defence", 0)))),
     }
     normalized["available_actions"] = build_available_actions(world, state, normalized)
+    # Preserve pinball_descriptor across round-trips (set once at combat start)
+    if raw_state.get("pinball_descriptor") is not None:
+        normalized["pinball_descriptor"] = raw_state["pinball_descriptor"]
     state.combat_state = normalized
     return normalized
 
@@ -904,6 +919,17 @@ def resolve_turn(
         damage = max(1, base_damage + variance - enemy_defence)
         enemy_state["hp"] = max(0, int(enemy_state["hp"]) - damage)
         combat_events.append(("player", f"You strike for {damage} damage.", "impact"))
+    elif action.startswith("pinball_strike:"):
+        try:
+            score = max(0, int(action.split(":", 1)[1]))
+        except ValueError:
+            score = 0
+        damage = max(0, score - enemy_defence)
+        if damage > 0:
+            enemy_state["hp"] = max(0, int(enemy_state["hp"]) - damage)
+            combat_events.append(("player", f"You channel {damage} damage into {enemy_def['name']}.", "impact"))
+        else:
+            combat_events.append(("player", "Your strike glances off.", "guard"))
     elif action == "defend":
         defended = True
         combat_events.append(("player", "You brace for the enemy's counterattack.", "guard"))

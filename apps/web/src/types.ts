@@ -110,6 +110,26 @@ export type CombatEnemy = {
   presentation: CombatPresentation;
 };
 
+export type EnemyPinballObstacle = {
+  kind: string;
+  label: string;
+  effect: string;
+  value: number;
+  detail: string;
+};
+
+export type PinballDescriptor = {
+  biome_id: string;
+  floor_seed: number;
+  enemy_id: string;
+  enemy_pinball: {
+    unique_obstacles?: EnemyPinballObstacle[];
+    accent?: string;
+    damage_node_count?: number;
+    converse_node_count?: number;
+  };
+};
+
 export type CombatState = {
   mode?: "turn-based";
   status: "engaged";
@@ -120,6 +140,7 @@ export type CombatState = {
   events: CombatEvent[];
   log: string[];
   negotiation?: CombatNegotiationState | null;
+  pinball_descriptor?: PinballDescriptor | null;
 };
 
 export type ViewportTransition =
