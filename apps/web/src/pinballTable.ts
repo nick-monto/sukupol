@@ -1,4 +1,4 @@
-import type { PinballDescriptor } from "./types";
+import type { ObstacleTemplate, PegDef, PinballDescriptor } from "./types";
 
 // ---------------------------------------------------------------------------
 // Cabinet geometry types
@@ -52,9 +52,16 @@ export interface CabinetSpec {
 // Biome types
 // ---------------------------------------------------------------------------
 
-export interface BiomeObstacleProfile {
-	postCount: [number, number];
-	postRadius: [number, number];
+export interface BiomePegConfig {
+	/** Total peg budget per table — each placed peg costs from this pool */
+	pegBudget: number;
+	/** Cost per post obstacle (usually 1) */
+	postCost: number;
+	/** Cost per bumper obstacle (usually 2) */
+	bumperCost: number;
+	/** Cost multiplier per enemy obstacle peg (usually 1, distinct from postCost for clarity) */
+	enemyPegCost: number;
+	/** Number of bonus bumpers to place alongside weapon orbs */
 	bonusBumpers: number;
 }
 
@@ -80,7 +87,7 @@ export interface BiomeConfig {
 	cabinetId: string;
 	physics: BiomePhysics;
 	theme: BiomeTheme;
-	obstacleProfile: BiomeObstacleProfile;
+	pegConfig: BiomePegConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,15 +96,25 @@ export interface BiomeConfig {
 
 export type BumperShape = "circle" | "square" | "triangle" | "pentagon";
 
-export interface ObstacleSpec {
-	id: string;
-	kind: "bumper" | "post" | "enemy";
+/** A single peg — the atomic collision unit of an obstacle */
+export interface PlacedPeg {
+	id: string; // "{obstacleId}:peg{N}"
+	parentId: string; // references ObstacleSpec.id
 	x: number;
 	y: number;
 	radius: number;
+}
+
+export interface ObstacleSpec {
+	id: string;
+	kind: "bumper" | "post" | "enemy";
+	parentId?: string; // if multi-peg obstacle, all pegs share this parent
+	x: number; // center X of the obstacle (for rendering)
+	y: number; // center Y
+	pegs: PlacedPeg[]; // individual collision circles derived from PegDef template
 	scoreValue: number;
-	weaponLabel?: string; // if set: 2× score when equipped weapon maps to this label
-	shape?: BumperShape; // weapon-driven shape override; absent = circle
+	weaponLabel?: string;
+	shape?: BumperShape;
 	effect?: string;
 	effectValue?: number;
 }
@@ -230,12 +247,14 @@ function scaleSpec(
 		// Horizontal walls (angle ≈ 0): length spans X → scale w by sx
 		// Diagonal walls: scale both w and h by average
 		const avgS = (sx + sy) / 2;
-		const scaleW =
-			sinA > 0.7
-				? Math.round(w.w * sy)
-				: cosA > 0.7
-					? Math.round(w.w * sx)
-					: Math.round(w.w * avgS);
+		let scaleW: number;
+		if (sinA > 0.7) {
+			scaleW = Math.round(w.w * sy);
+		} else if (cosA > 0.7) {
+			scaleW = Math.round(w.w * sx);
+		} else {
+			scaleW = Math.round(w.w * avgS);
+		}
 		const scaleH = sinA > 0.7 || cosA > 0.7 ? w.h : Math.round(w.h * avgS);
 		return {
 			x: scX(w.x),
@@ -243,7 +262,7 @@ function scaleSpec(
 			w: scaleW,
 			h: scaleH,
 			angle: w.angle,
-			...(w.chamfer != null ? { chamfer: w.chamfer } : {}),
+			...(w.chamfer !== null ? { chamfer: w.chamfer } : {}),
 		};
 	}
 
@@ -337,9 +356,11 @@ export const BIOME_CONFIGS: Record<string, BiomeConfig> = {
 			obstacle: "#9B6B8A",
 			obstacleStyle: "default",
 		},
-		obstacleProfile: {
-			postCount: [10, 13],
-			postRadius: [9, 13],
+		pegConfig: {
+			pegBudget: 24,
+			postCost: 1,
+			bumperCost: 2,
+			enemyPegCost: 1,
 			bonusBumpers: 3,
 		},
 	},
@@ -357,9 +378,11 @@ export const BIOME_CONFIGS: Record<string, BiomeConfig> = {
 			obstacle: "#6BAA55",
 			obstacleStyle: "moss",
 		},
-		obstacleProfile: {
-			postCount: [14, 18],
-			postRadius: [9, 12],
+		pegConfig: {
+			pegBudget: 28,
+			postCost: 1,
+			bumperCost: 2,
+			enemyPegCost: 1,
 			bonusBumpers: 3,
 		},
 	},
@@ -377,9 +400,11 @@ export const BIOME_CONFIGS: Record<string, BiomeConfig> = {
 			obstacle: "#A87B44",
 			obstacleStyle: "stone",
 		},
-		obstacleProfile: {
-			postCount: [10, 14],
-			postRadius: [10, 14],
+		pegConfig: {
+			pegBudget: 26,
+			postCost: 1,
+			bumperCost: 2,
+			enemyPegCost: 1,
 			bonusBumpers: 3,
 		},
 	},
@@ -397,9 +422,11 @@ export const BIOME_CONFIGS: Record<string, BiomeConfig> = {
 			obstacle: "#2A7080",
 			obstacleStyle: "archive",
 		},
-		obstacleProfile: {
-			postCount: [12, 16],
-			postRadius: [9, 13],
+		pegConfig: {
+			pegBudget: 30,
+			postCost: 1,
+			bumperCost: 2,
+			enemyPegCost: 1,
 			bonusBumpers: 3,
 		},
 	},
@@ -431,20 +458,83 @@ function mulberry32(seed: number): () => number {
 }
 
 // ---------------------------------------------------------------------------
-// Traversability helpers
+// Constants
 // ---------------------------------------------------------------------------
 
 const BALL_R = 14;
 const MIN_PASSAGE = BALL_R * 3; // 42 px — minimum clear gap in any y-band
-const OBS_CLEARANCE = BALL_R * 2.5; // 35 px — extra gap between obstacle edges
+const PEG_CLEARANCE = BALL_R * 2.5; // 35 px — extra gap between peg edges
 const BAND_H = BALL_R * 4; // 56 px — height of each y-band
+
+// ---------------------------------------------------------------------------
+// Helper: resolve legacy enemy obstacles to ObstacleTemplate[]
+// ponytail: single-line migration — deletes the old format at runtime
+//           so bootstrap.json can be updated incrementally per-enemy
+// ---------------------------------------------------------------------------
+
+function resolveEnemyObstacles(
+	enemyPinball: PinballDescriptor["enemy_pinball"],
+): ObstacleTemplate[] {
+	if (enemyPinball?.obstacles) {
+		// Warn if both formats exist — indicates incomplete migration
+		if (enemyPinball.unique_obstacles?.length) {
+			// eslint-disable-next-line no-console-except-error -- content-author diagnostic
+			console.warn(
+				"[pinball] enemy has both 'obstacles' and 'unique_obstacles'; ignoring legacy data",
+			);
+		}
+		return enemyPinball.obstacles;
+	}
+	const legacy = enemyPinball?.unique_obstacles ?? [];
+	return legacy.map((o, i) => ({
+		id: o.kind ?? `legacy-${i}`,
+		label: o.label ?? "Obstacle",
+		pegs: [{ angle: 0, distance: 0, radius: 20 }],
+		effect: o.effect,
+		effectValue: o.value,
+		scoreValue: Math.max(15, (o.value ?? 1) * 15),
+		detail: o.detail,
+	}));
+}
+
+// ---------------------------------------------------------------------------
+// Helper: expand PegDef template into PlacedPeg positions at a given center
+// ---------------------------------------------------------------------------
+
+function expandPegs(
+	parentId: string,
+	cx: number,
+	y: number,
+	templatePegs: PegDef[],
+): PlacedPeg[] {
+	return templatePegs.map((p, i) => ({
+		id: `${parentId}:peg${i}`,
+		parentId,
+		x: Math.round(cx + p.distance * Math.cos(p.angle)),
+		y: Math.round(y + p.distance * Math.sin(p.angle)),
+		radius: p.radius,
+	}));
+}
+
+// ---------------------------------------------------------------------------
+// Traversability — peg-aware interval merging per y-band
+// ---------------------------------------------------------------------------
+
+/** Collects all placed peg circles into a flat array */
+function flattenPegs(obstacles: ObstacleSpec[]): PlacedPeg[] {
+	const out: PlacedPeg[] = [];
+	for (const o of obstacles) {
+		out.push(...o.pegs);
+	}
+	return out;
+}
 
 /**
  * Returns true if the horizontal band centred at `bandY` still has at least
- * one gap ≥ MIN_PASSAGE, given the provided obstacle list.
+ * one gap ≥ MIN_PASSAGE, given all placed peg circles.
  */
 function bandHasPassage(
-	obs: ObstacleSpec[],
+	allPegs: PlacedPeg[],
 	bandY: number,
 	pb: CabinetSpec["placementBounds"],
 ): boolean {
@@ -452,11 +542,11 @@ function bandHasPassage(
 	const pbRight = pb.x + pb.w;
 
 	const intervals: [number, number][] = [];
-	for (const o of obs) {
-		if (o.y + o.radius < bandY - halfBand) continue;
-		if (o.y - o.radius > bandY + halfBand) continue;
-		const left = Math.max(pb.x, o.x - o.radius - BALL_R);
-		const right = Math.min(pbRight, o.x + o.radius + BALL_R);
+	for (const p of allPegs) {
+		if (p.y + p.radius < bandY - halfBand) continue;
+		if (p.y - p.radius > bandY + halfBand) continue;
+		const left = Math.max(pb.x, p.x - p.radius - BALL_R);
+		const right = Math.min(pbRight, p.x + p.radius + BALL_R);
 		if (right > left) intervals.push([left, right]);
 	}
 
@@ -465,13 +555,11 @@ function bandHasPassage(
 	intervals.sort((a, b) => a[0] - b[0]);
 	const merged: [number, number][] = [];
 	for (const iv of intervals) {
-		if (!merged.length || iv[0] > merged[merged.length - 1][1]) {
+		const last = merged.at(-1);
+		if (!last || iv[0] > last[1]) {
 			merged.push([...iv] as [number, number]);
 		} else {
-			merged[merged.length - 1][1] = Math.max(
-				merged[merged.length - 1][1],
-				iv[1],
-			);
+			last[1] = Math.max(last[1], iv[1]);
 		}
 	}
 
@@ -484,29 +572,33 @@ function bandHasPassage(
 }
 
 /**
- * Returns true if adding `candidate` to `placed` still leaves a traversable
- * passage in every y-band the candidate's circle overlaps.
+ * Returns true if adding `candidatePegs` to existing pegs still leaves a
+ * traversable passage in every y-band any candidate peg overlaps.
  */
 function hasPassage(
-	placed: ObstacleSpec[],
-	candidate: ObstacleSpec,
+	existingPegs: PlacedPeg[],
+	candidatePegs: PlacedPeg[],
 	pb: CabinetSpec["placementBounds"],
 ): boolean {
-	const withCandidate = [...placed, candidate];
-	const topY = candidate.y - candidate.radius;
-	const botY = candidate.y + candidate.radius;
+	const all = [...existingPegs, ...candidatePegs];
+	let minY = Infinity;
+	let maxY = -Infinity;
+	for (const p of candidatePegs) {
+		minY = Math.min(minY, p.y - p.radius);
+		maxY = Math.max(maxY, p.y + p.radius);
+	}
 	const firstBand =
-		Math.floor((topY - pb.y) / BAND_H) * BAND_H + pb.y + BAND_H / 2;
+		Math.floor((minY - pb.y) / BAND_H) * BAND_H + pb.y + BAND_H / 2;
 	const lastBand =
-		Math.floor((botY - pb.y) / BAND_H) * BAND_H + pb.y + BAND_H / 2;
+		Math.floor((maxY - pb.y) / BAND_H) * BAND_H + pb.y + BAND_H / 2;
 	for (let bandY = firstBand; bandY <= lastBand + 1; bandY += BAND_H) {
-		if (!bandHasPassage(withCandidate, bandY, pb)) return false;
+		if (!bandHasPassage(all, bandY, pb)) return false;
 	}
 	return true;
 }
 
 // ---------------------------------------------------------------------------
-// generatePinballTable — seeded open-cabinet obstacle procgen
+// generatePinballTable — seeded peg-budget obstacle procgen
 // ---------------------------------------------------------------------------
 
 export function generatePinballTable(
@@ -515,27 +607,34 @@ export function generatePinballTable(
 	const biomeConfig = BIOME_CONFIGS[descriptor.biome_id] ?? DEFAULT_BIOME;
 	const cabinet =
 		CABINET_SPECS[biomeConfig.cabinetId] ?? CABINET_SPECS["standard"];
-	const { physics, theme, obstacleProfile: profile } = biomeConfig;
+	const { physics, theme, pegConfig } = biomeConfig;
 	const pb = cabinet.placementBounds;
 
 	const seed =
 		((descriptor.floor_seed ?? 0) ^ hashStr(descriptor.enemy_id ?? "")) >>> 0;
 	const rng = mulberry32(seed);
 
-	// ── Placed obstacle list ────────────────────────────────────────────────
+	// ── State ───────────────────────────────────────────────────────────────
 	const placed: ObstacleSpec[] = [];
+	let budgetLeft = pegConfig.pegBudget;
 
-	function clearOf(x: number, y: number, r: number): boolean {
-		for (const o of placed) {
-			const dx = o.x - x;
-			const dy = o.y - y;
-			if (Math.sqrt(dx * dx + dy * dy) < o.radius + r + OBS_CLEARANCE)
+	function allPegs(): PlacedPeg[] {
+		return flattenPegs(placed);
+	}
+
+	// Check if a single peg collides with any existing peg
+	function pegClearOf(x: number, y: number, r: number): boolean {
+		for (const p of allPegs()) {
+			const dx = p.x - x;
+			const dy = p.y - y;
+			if (Math.sqrt(dx * dx + dy * dy) < p.radius + r + PEG_CLEARANCE)
 				return false;
 		}
 		return true;
 	}
 
-	function notExcluded(x: number, y: number, r: number): boolean {
+	// Check if a peg is inside any exclusion zone
+	function pegNotExcluded(x: number, y: number, r: number): boolean {
 		for (const ez of cabinet.exclusionZones) {
 			const dx = ez.x - x;
 			const dy = ez.y - y;
@@ -544,42 +643,63 @@ export function generatePinballTable(
 		return true;
 	}
 
-	function tryAccept(spec: ObstacleSpec): boolean {
-		const { x, y, radius: r } = spec;
-		if (x - r < pb.x || x + r > pb.x + pb.w) return false;
-		if (y - r < pb.y || y + r > pb.y + pb.h) return false;
-		if (!notExcluded(x, y, r)) return false;
-		if (!clearOf(x, y, r)) return false;
-		if (!hasPassage(placed, spec, pb)) return false;
+	// Accept a pre-built obstacle spec — validates all its pegs at once
+	function tryAccept(spec: ObstacleSpec, cost: number): boolean {
+		if (cost > budgetLeft) return false;
+		for (const p of spec.pegs) {
+			if (p.x - p.radius < pb.x || p.x + p.radius > pb.x + pb.w) return false;
+			if (p.y - p.radius < pb.y || p.y + p.radius > pb.y + pb.h) return false;
+			if (!pegNotExcluded(p.x, p.y, p.radius)) return false;
+			if (!pegClearOf(p.x, p.y, p.radius)) return false;
+		}
+		if (!hasPassage(allPegs(), spec.pegs, pb)) return false;
 		placed.push(spec);
+		budgetLeft -= cost;
 		return true;
 	}
 
-	// ── 1. Weapon orbs — fixed positions, always placed ────────────────────
+	// ── 1. Weapon orbs — fixed positions, always placed (cost: 0) ──────────
 	for (const slot of cabinet.orbSlots) {
 		placed.push({
 			id: slot.label,
 			kind: "bumper",
 			x: slot.x,
 			y: slot.y,
-			radius: 28,
+			pegs: [
+				{
+					id: `${slot.label}:peg0`,
+					parentId: slot.label,
+					x: slot.x,
+					y: slot.y,
+					radius: 28,
+				},
+			],
 			scoreValue: 10,
 			weaponLabel: slot.label,
 		});
 	}
-
-	// ── 2. Shuffled candidate grid ─────────────────────────────────────────
-	const CELL = 70;
-	const cols = Math.floor(pb.w / CELL);
-	const rows = Math.floor(pb.h / CELL);
-	const candidates: [number, number][] = [];
-
-	for (let row = 0; row < rows; row++) {
-		for (let col = 0; col < cols; col++) {
-			const cx = pb.x + col * CELL + CELL / 2 + Math.round((rng() - 0.5) * 50);
-			const cy = pb.y + row * CELL + CELL / 2 + Math.round((rng() - 0.5) * 50);
-			candidates.push([cx, cy]);
+	// Validate orb placement doesn't overlap existing geometry (authoring guard)
+	for (const slot of cabinet.orbSlots) {
+		if (!pegNotExcluded(slot.x, slot.y, 28)) {
+			// eslint-disable-next-line no-console-except-error -- content-author diagnostic
+			console.warn(`[pinball] orb "${slot.label}" overlaps an exclusion zone`);
 		}
+		if (!pegClearOf(slot.x, slot.y, 28)) {
+			// eslint-disable-next-line no-console-except-error -- content-author diagnostic
+			console.warn(`[pinball] orb "${slot.label}" overlaps another obstacle`);
+		}
+	}
+
+	// ── 2. Shuffled candidate positions — continuous (not grid) ────────────
+	// ponytail: 72 candidates — enough for dense tables without wasting RNG cycles
+	const NUM_CANDIDATES = 72;
+	// Margin must clear the largest expected peg spread (distance+radius ≈ 30px)
+	const CANDIDATE_MARGIN = 35;
+	const candidates: [number, number][] = [];
+	for (let i = 0; i < NUM_CANDIDATES; i++) {
+		const cx = pb.x + CANDIDATE_MARGIN + rng() * (pb.w - CANDIDATE_MARGIN * 2);
+		const cy = pb.y + CANDIDATE_MARGIN + rng() * (pb.h - CANDIDATE_MARGIN * 2);
+		candidates.push([cx, cy]);
 	}
 	// Fisher-Yates shuffle
 	for (let i = candidates.length - 1; i > 0; i--) {
@@ -587,77 +707,105 @@ export function generatePinballTable(
 		[candidates[i], candidates[j]] = [candidates[j], candidates[i]];
 	}
 
-	// ── 3. Bonus bumpers then posts ────────────────────────────────────────
-	const postCount =
-		profile.postCount[0] +
-		Math.floor(rng() * (profile.postCount[1] - profile.postCount[0] + 1));
-	let bumpersPlaced = 0;
-	let postsPlaced = 0;
-
-	for (const [cx, cy] of candidates) {
-		if (bumpersPlaced >= profile.bonusBumpers && postsPlaced >= postCount)
-			break;
-
-		if (bumpersPlaced < profile.bonusBumpers) {
-			const orbLabels = ["orb-center", "orb-left", "orb-right"];
-			if (
-				tryAccept({
-					id: `bumper-bonus-${bumpersPlaced}`,
-					kind: "bumper",
-					x: cx,
-					y: cy,
-					radius: 26,
-					scoreValue: 12,
-					weaponLabel: orbLabels[bumpersPlaced],
-				})
-			) {
-				bumpersPlaced++;
-			}
-		} else if (postsPlaced < postCount) {
-			const r =
-				profile.postRadius[0] +
-				Math.floor(rng() * (profile.postRadius[1] - profile.postRadius[0] + 1));
-			if (
-				tryAccept({
-					id: `post-${postsPlaced}`,
-					kind: "post",
-					x: cx,
-					y: cy,
-					radius: r,
-					scoreValue: 3,
-				})
-			) {
-				postsPlaced++;
-			}
+	// ── Helper: try placing a single-peg obstacle at the next candidate ─────
+	// ponytail: while loop instead of for-of — stateful index shared across calls
+	let candidateIdx = 0;
+	function tryPlaceSinglePeg(
+		id: string,
+		kind: "bumper" | "post",
+		radius: number,
+		scoreValue: number,
+		weaponLabel?: string,
+	): boolean {
+		while (candidateIdx < candidates.length) {
+			const [cx, cy] = candidates[candidateIdx++];
+			return tryAccept(
+				{
+					id,
+					kind,
+					x: Math.round(cx),
+					y: Math.round(cy),
+					pegs: [
+						{
+							id: `${id}:peg0`,
+							parentId: id,
+							x: Math.round(cx),
+							y: Math.round(cy),
+							radius,
+						},
+					],
+					scoreValue,
+					weaponLabel,
+				},
+				kind === "bumper" ? pegConfig.bumperCost : pegConfig.postCost,
+			);
 		}
+		return false;
 	}
 
-	// ── 4. Enemy unique obstacles (up to 2, re-scan candidates) ───────────
-	const uniqueObs = descriptor.enemy_pinball?.unique_obstacles ?? [];
-	let enemyPlaced = 0;
+	// ── 3. Bonus bumpers (cost: bumperCost each) ───────────────────────────
+	for (let i = 0; i < pegConfig.bonusBumpers; i++) {
+		const orbLabels = ["orb-center", "orb-left", "orb-right"];
+		tryPlaceSinglePeg(`bumper-bonus-${i}`, "bumper", 26, 12, orbLabels[i % 3]);
+	}
 
-	for (const [cx, cy] of candidates) {
-		if (enemyPlaced >= Math.min(uniqueObs.length, 2)) break;
-		const obs = uniqueObs[enemyPlaced];
-		const jx = Math.round((rng() - 0.5) * 30);
-		const jy = Math.round((rng() - 0.5) * 30);
+	// ── 4. Posts — fill remaining budget (cost: postCost each) ─────────────
+	const postRadiusRange = [9, 14];
+	while (budgetLeft >= pegConfig.postCost) {
+		const r =
+			postRadiusRange[0] +
+			Math.floor(rng() * (postRadiusRange[1] - postRadiusRange[0] + 1));
 		if (
-			tryAccept({
-				id: `enemy-obs-${enemyPlaced}`,
-				kind: "enemy",
-				x: cx + jx,
-				y: cy + jy,
-				radius: 20,
-				scoreValue: Math.max(15, (obs.value ?? 1) * 15),
-				effect: obs.effect,
-				effectValue: obs.value,
-			})
+			!tryPlaceSinglePeg(
+				`post-${placed.filter((o) => o.kind === "post").length}`,
+				"post",
+				r,
+				3,
+			)
 		) {
-			enemyPlaced++;
+			break; // no more candidates fit
 		}
 	}
 
-	// ── 5. Weak-point — lower-centre of placement bounds ──────────────────
+	// ── 5. Enemy obstacles (cost: number of pegs × postCost each) ─────────
+	const enemyObs = resolveEnemyObstacles(descriptor.enemy_pinball);
+	let enemyPlaced = 0;
+	for (const template of enemyObs) {
+		if (enemyPlaced >= 2) break;
+		const cost = template.pegs.length * pegConfig.enemyPegCost;
+		if (cost > budgetLeft) continue;
+
+		// Try each remaining candidate with jitter
+		let placedEnemy = false;
+		while (!placedEnemy && candidateIdx < candidates.length) {
+			const [cx, cy] = candidates[candidateIdx++];
+			const jx = Math.round((rng() - 0.5) * 30);
+			const jy = Math.round((rng() - 0.5) * 30);
+			const px = Math.round(cx + jx);
+			const py = Math.round(cy + jy);
+			const pegs = expandPegs(template.id, px, py, template.pegs);
+
+			placedEnemy = tryAccept(
+				{
+					id: `enemy-${template.id}-${enemyPlaced}`,
+					kind: "enemy",
+					parentId: template.id,
+					x: px,
+					y: py,
+					pegs,
+					scoreValue:
+						template.scoreValue ??
+						Math.max(15, (template.effectValue ?? 1) * 15),
+					effect: template.effect,
+					effectValue: template.effectValue,
+				},
+				cost,
+			);
+		}
+		if (placedEnemy) enemyPlaced++;
+	}
+
+	// ── 6. Weak-point — lower-centre of placement bounds ──────────────────
 	const wpXMin = pb.x + pb.w * 0.2;
 	const wpXMax = pb.x + pb.w * 0.8;
 	const wpYMin = pb.y + pb.h * 0.55;
@@ -669,15 +817,16 @@ export function generatePinballTable(
 		radius: 18,
 	};
 
+	const allP = allPegs();
 	for (let attempt = 0; attempt < 30; attempt++) {
 		const wx = Math.round(wpXMin + rng() * (wpXMax - wpXMin));
 		const wy = Math.round(wpYMin + rng() * (wpYMax - wpYMin));
 
 		let tooClose = false;
-		for (const o of placed) {
-			const dx = o.x - wx,
-				dy = o.y - wy;
-			if (Math.sqrt(dx * dx + dy * dy) < o.radius + 18 + OBS_CLEARANCE) {
+		for (const p of allP) {
+			const dx = p.x - wx,
+				dy = p.y - wy;
+			if (Math.sqrt(dx * dx + dy * dy) < p.radius + 18 + PEG_CLEARANCE) {
 				tooClose = true;
 				break;
 			}

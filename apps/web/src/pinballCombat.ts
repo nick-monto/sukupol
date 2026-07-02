@@ -2,6 +2,7 @@ import Matter from "matter-js";
 import type {
 	PinballTableLayout,
 	ObstacleSpec,
+	PlacedPeg,
 	BumperShape,
 } from "./pinballTable";
 
@@ -32,6 +33,7 @@ const WEAPON_BUMPER_SHAPE: Record<
 const ORB_LABEL_ORDER = ["orb-center", "orb-left", "orb-right"];
 
 const MAX_VELOCITY = 50;
+const OBSTACLE_HIT_COOLDOWN = 80; // ms — prevent multi-peg double-scoring
 const BALL_RADIUS = 14;
 
 // ---------------------------------------------------------------------------
@@ -70,6 +72,7 @@ export function setupPinball(
 	canvas.width = W;
 	canvas.height = H;
 
+	// ponytail: getContext("2d") on a valid canvas never returns null in practice
 	const ctx = canvas.getContext("2d")!;
 
 	// ── Engine ────────────────────────────────────────────────────────────────
@@ -94,35 +97,45 @@ export function setupPinball(
 		}
 	}
 
-	// ── Fast obstacle lookup (id → spec + body) ────────────────────────────
+	// ── Fast obstacle lookup (id → spec + peg bodies) ─────────────────────
 	const obstacleSpecMap = new Map<string, ObstacleSpec>(
 		obstacleSpecs.map((o) => [o.id, o]),
 	);
-	const obstacleBodyMap = new Map<string, Matter.Body>();
+	// Map from peg id → body; also keep parentId → body[] for rendering
+	const pegBodyMap = new Map<string, Matter.Body>();
+	const parentPegBodies = new Map<string, Matter.Body[]>();
 
-	const allObstacleBodies: Matter.Body[] = obstacleSpecs.map((obs) => {
-		const bodyOpts = {
-			label: `obstacle:${obs.id}`,
-			isStatic: true,
-			restitution: obs.kind === "post" ? 0.4 : physics.bumperRestitution,
-			friction: 0,
-		};
-		const shape = obstacleShapeMap.get(obs.id) ?? "circle";
-		const sides =
-			shape === "triangle"
-				? 3
-				: shape === "square"
-					? 4
-					: shape === "pentagon"
-						? 5
-						: 0;
-		const b =
-			sides > 0
-				? Bodies.polygon(obs.x, obs.y, sides, obs.radius, bodyOpts)
-				: Bodies.circle(obs.x, obs.y, obs.radius, bodyOpts);
-		obstacleBodyMap.set(obs.id, b);
-		return b;
-	});
+	const allObstacleBodies: Matter.Body[] = [];
+	for (const obs of obstacleSpecs) {
+		const bodiesForObs: Matter.Body[] = [];
+		for (const peg of obs.pegs) {
+			const bodyOpts = {
+				label: `obstacle:${obs.id}`,
+				isStatic: true,
+				restitution: obs.kind === "post" ? 0.4 : physics.bumperRestitution,
+				friction: 0,
+			};
+			const shape = obstacleShapeMap.get(obs.id) ?? "circle";
+			let sides: number;
+			if (shape === "triangle") {
+				sides = 3;
+			} else if (shape === "square") {
+				sides = 4;
+			} else if (shape === "pentagon") {
+				sides = 5;
+			} else {
+				sides = 0;
+			}
+			const b =
+				sides > 0
+					? Bodies.polygon(peg.x, peg.y, sides, peg.radius, bodyOpts)
+					: Bodies.circle(peg.x, peg.y, peg.radius, bodyOpts);
+			pegBodyMap.set(peg.id, b);
+			bodiesForObs.push(b);
+			allObstacleBodies.push(b);
+		}
+		parentPegBodies.set(obs.id, bodiesForObs);
+	}
 
 	// ── Weak-point body ────────────────────────────────────────────────────
 	const weakPointBody = Bodies.circle(wpSpec.x, wpSpec.y, wpSpec.radius, {
@@ -266,6 +279,8 @@ export function setupPinball(
 	// Flash state: obstacle id → expiry ms; weak-point expiry
 	const orbFlash = new Map<string, number>();
 	let weakPointFlash = 0;
+	// Cooldown: obstacle id → last-hit timestamp (prevents multi-peg double-scoring)
+	const lastHitTime = new Map<string, number>();
 
 	// ── Hatch helpers ──────────────────────────────────────────────────────
 	function openHatch() {
@@ -302,12 +317,14 @@ export function setupPinball(
 				const { bodyA, bodyB } = pair;
 				// Determine which body is the pinball (don't assume bodyB — body order
 				// depends on internal Matter.js ID assignment which can shift).
-				const pinball =
-					bodyA.label === "pinball"
-						? bodyA
-						: bodyB.label === "pinball"
-							? bodyB
-							: null;
+				let pinball: Matter.Body | null;
+				if (bodyA.label === "pinball") {
+					pinball = bodyA;
+				} else if (bodyB.label === "pinball") {
+					pinball = bodyB;
+				} else {
+					pinball = null;
+				}
 				if (!pinball) continue;
 				const other = pinball === bodyA ? bodyB : bodyA;
 
@@ -324,6 +341,11 @@ export function setupPinball(
 					const obsId = other.label.slice(9);
 					const obs = obstacleSpecMap.get(obsId);
 					if (!obs) continue;
+					// Cooldown: skip if another peg of the same obstacle was just hit
+					const now = performance.now();
+					const lastHit = lastHitTime.get(obsId) ?? 0;
+					if (now - lastHit < OBSTACLE_HIT_COOLDOWN) continue;
+					lastHitTime.set(obsId, now);
 					const weaponOrbLabel = equippedWeaponType
 						? WEAPON_ORB[equippedWeaponType.toLowerCase()]
 						: null;
@@ -477,63 +499,77 @@ export function setupPinball(
 
 	function drawObstacle(
 		obs: ObstacleSpec,
-		body: Matter.Body,
+		pegs: PlacedPeg[],
+		bodies: Matter.Body[],
 		flashing: boolean,
 	): void {
-		const { x, y } = body.position;
-		const r = obs.radius;
 		const weaponOrbLabel = equippedWeaponType
 			? WEAPON_ORB[equippedWeaponType.toLowerCase()]
 			: null;
 
-		if (obs.kind === "post") {
-			ctx.save();
-			ctx.globalAlpha = 0.55;
-			drawCirc(x, y, r, theme.walls);
-			ctx.restore();
-		} else if (obs.kind === "bumper") {
-			const isActive = obs.weaponLabel === weaponOrbLabel;
-			const shape = obstacleShapeMap.get(obs.id) ?? "circle";
-			const fill = flashing ? theme.orbHit : isActive ? "#7a5fd8" : theme.orbs;
-			const stroke =
-				isActive && !flashing ? "rgba(255, 220, 140, 0.7)" : undefined;
+		for (let i = 0; i < pegs.length; i++) {
+			const peg = pegs[i];
+			const body = bodies[i];
+			if (!body) continue;
+			const { x, y } = body.position;
 
-			if (isActive && !flashing) {
+			if (obs.kind === "post") {
 				ctx.save();
-				ctx.shadowColor = "rgba(214, 179, 116, 0.6)";
-				ctx.shadowBlur = 12;
-			}
-
-			if (shape === "circle") {
-				drawCirc(x, y, r, fill, stroke);
-			} else {
-				// Polygon — use the physics body vertices so shape matches collision hull
-				drawPoly(body, fill);
-				if (stroke) {
-					ctx.strokeStyle = stroke;
-					ctx.lineWidth = 2;
-					const v = body.vertices;
-					ctx.beginPath();
-					ctx.moveTo(v[0].x, v[0].y);
-					for (let i = 1; i < v.length; i++) ctx.lineTo(v[i].x, v[i].y);
-					ctx.closePath();
-					ctx.stroke();
+				ctx.globalAlpha = 0.55;
+				drawCirc(x, y, peg.radius, theme.walls);
+				ctx.restore();
+			} else if (obs.kind === "bumper") {
+				const isActive = obs.weaponLabel === weaponOrbLabel;
+				const shape = obstacleShapeMap.get(obs.id) ?? "circle";
+				let fill: string;
+				if (flashing) {
+					fill = theme.orbHit;
+				} else if (isActive) {
+					fill = "#7a5fd8";
+				} else {
+					fill = theme.orbs;
 				}
-			}
+				const stroke =
+					isActive && !flashing ? "rgba(255, 220, 140, 0.7)" : undefined;
 
-			if (isActive && !flashing) ctx.restore();
-		} else {
-			// Enemy-specific obstacle: rotated square (diamond style)
-			ctx.save();
-			ctx.translate(x, y);
-			ctx.rotate(Math.PI / 4);
-			ctx.fillStyle = flashing ? theme.orbHit : theme.obstacle;
-			if (theme.obstacleStyle !== "default") {
-				ctx.shadowColor = theme.obstacle;
-				ctx.shadowBlur = 8;
+				if (isActive && !flashing) {
+					ctx.save();
+					ctx.shadowColor = "rgba(214, 179, 116, 0.6)";
+					ctx.shadowBlur = 12;
+				}
+
+				if (shape === "circle") {
+					drawCirc(x, y, peg.radius, fill, stroke);
+				} else {
+					// Polygon — use the physics body vertices so shape matches collision hull
+					drawPoly(body, fill);
+					if (stroke) {
+						ctx.strokeStyle = stroke;
+						ctx.lineWidth = 2;
+						const v = body.vertices;
+						ctx.beginPath();
+						ctx.moveTo(v[0].x, v[0].y);
+						for (let j = 1; j < v.length; j++) ctx.lineTo(v[j].x, v[j].y);
+						ctx.closePath();
+						ctx.stroke();
+					}
+				}
+
+				if (isActive && !flashing) ctx.restore();
+			} else {
+				// Enemy-specific obstacle: rotated square (diamond style)
+				ctx.save();
+				ctx.translate(x, y);
+				ctx.rotate(Math.PI / 4);
+				const r = peg.radius;
+				ctx.fillStyle = flashing ? theme.orbHit : theme.obstacle;
+				if (theme.obstacleStyle !== "default") {
+					ctx.shadowColor = theme.obstacle;
+					ctx.shadowBlur = 8;
+				}
+				ctx.fillRect(-r * 0.7, -r * 0.7, r * 1.4, r * 1.4);
+				ctx.restore();
 			}
-			ctx.fillRect(-r * 0.7, -r * 0.7, r * 1.4, r * 1.4);
-			ctx.restore();
 		}
 	}
 
@@ -569,10 +605,10 @@ export function setupPinball(
 		// Obstacles (orbs + enemy-specific)
 		const now = performance.now();
 		for (const obs of obstacleSpecs) {
-			const body = obstacleBodyMap.get(obs.id);
-			if (!body) continue;
+			const bodies = parentPegBodies.get(obs.id);
+			if (!bodies || !bodies.length) continue;
 			const flashing = now < (orbFlash.get(obs.id) ?? 0);
-			drawObstacle(obs, body, flashing);
+			drawObstacle(obs, obs.pegs, bodies, flashing);
 		}
 
 		// Weak-point — pulsing ring
