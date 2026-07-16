@@ -1,0 +1,40 @@
+.shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.shell[data-mode="combat"] {
+  --accent: #d89482;
+  --accent-strong: #f4bfae;
+}
+
+.shell[data-mode="archived"] {
+  --accent: #a7b0b6;
+  --accent-strong: #d9dde0;
+}
+
+.hero,
+.panel {
+  position: relative;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  animation: rise-in 280ms ease both;
+  transition:
+    border-color 220ms ease,
+    background 220ms ease,
+    transform 220ms ease;
+}
+
+.hero {
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(18, 24, 29, 0.96) 0%, rgba(12, 17, 21, 0.96) 100%);
+}
+
+.panel {
+  border-radius: 16px;
+  padding: 1rem;
+}
+

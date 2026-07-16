@@ -228,3 +228,7 @@ services/game-api/data/*.db-shm
 services/game-api/data/*.db-wal
 
 docs/
+
+# Agent harness subagent transcripts / spilled outputs (not project sources)
+.pi-subagents/
+.github

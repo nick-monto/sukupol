@@ -1,0 +1,188 @@
+.viewport-chat {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  height: min(72vh, 56rem);
+  min-width: 0;
+  min-height: 28rem;
+  max-height: none;
+  margin-top: 0;
+  padding: 0.95rem 1rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(11, 15, 19, 0.96) 0%, rgba(8, 11, 14, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.viewport-chat-overlay {
+  top: var(--overlay-gap);
+  right: var(--overlay-gap);
+  bottom: var(--overlay-gap);
+  width: min(var(--right-rail-width), calc(100vw - (var(--overlay-gap) * 2)));
+}
+
+.hero-overlay,
+.viewport-location-card,
+.viewport-dock-card,
+.outcome-overlay {
+  background: linear-gradient(180deg, rgba(10, 14, 18, 0.9) 0%, rgba(7, 10, 13, 0.96) 100%);
+  backdrop-filter: blur(12px);
+}
+
+.viewport-location-card,
+.viewport-dock-card {
+  padding: 0.95rem 1rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.26);
+}
+
+.viewport-location-card .panel-header {
+  margin-bottom: 0.65rem;
+}
+
+.viewport-location-card .location-meta,
+.outcome-overlay .panel-note {
+  max-width: none;
+}
+
+.viewport-controls-overlay {
+  flex: 1 1 auto;
+  max-width: var(--bottom-bar-width);
+  padding: 0.8rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(11, 15, 19, 0.88) 0%, rgba(8, 11, 14, 0.94) 100%);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+}
+
+.outcome-overlay {
+  width: clamp(18rem, 26vw, 24rem);
+  max-height: min(34vh, 24rem);
+  overflow: auto;
+}
+
+.viewport-chat-resize-handle {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0.1rem 0 0.35rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: ns-resize;
+}
+
+.viewport-chat-resize-handle:hover,
+.viewport-chat-resize-handle:focus-visible {
+  transform: none;
+  border-color: transparent;
+  background: transparent;
+}
+
+.viewport-chat-resize-grip {
+  width: min(7rem, 22%);
+  height: 0.4rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(152, 183, 174, 0.2), rgba(214, 179, 116, 0.52), rgba(152, 183, 174, 0.2));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.viewport-chat.is-resizing,
+.viewport-chat.is-resizing * {
+  cursor: ns-resize;
+  user-select: none;
+}
+
+.viewport-chat-roster,
+.viewport-chat-stage {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.npc-roster {
+  display: flex;
+  gap: 0.45rem;
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 0.1rem;
+}
+
+.npc-tab {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 9rem;
+  justify-items: start;
+  padding: 0.55rem 0.8rem;
+  border-radius: 12px 12px 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  letter-spacing: normal;
+  text-transform: none;
+  font-size: 0.82rem;
+}
+
+.npc-tab:hover {
+  transform: none;
+}
+
+.npc-tab.is-selected,
+.npc-tab:disabled {
+  border-color: rgba(214, 179, 116, 0.3);
+  background: linear-gradient(180deg, rgba(214, 179, 116, 0.16), rgba(214, 179, 116, 0.06));
+  opacity: 1;
+}
+
+.npc-tab-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.npc-tab-meta {
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chat-transcript {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow: auto;
+  padding: 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    radial-gradient(circle at top, rgba(214, 179, 116, 0.06), transparent 34%),
+    linear-gradient(180deg, rgba(8, 12, 15, 0.92) 0%, rgba(10, 15, 18, 0.98) 100%);
+}
+
+.viewport-chat[data-mode="combat"] {
+  gap: 0.7rem;
+}
+
+.viewport-chat[data-mode="combat"] .panel-note {
+  max-width: none;
+  text-align: left;
+}
+
+.viewport-chat[data-mode="combat"] .chat-transcript {
+  gap: 0.6rem;
+  padding: 0.8rem;
+}
+
+.chat-empty {
+  padding: 1rem;
+  border-radius: 12px;
+  color: var(--text-soft);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+}

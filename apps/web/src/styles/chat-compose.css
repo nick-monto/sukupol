@@ -1,0 +1,36 @@
+.viewport-chat-compose {
+  padding-top: 0.2rem;
+  min-width: 0;
+}
+
+.chat-composer-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.55rem;
+  align-items: end;
+}
+
+.chat-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.chat-composer-row textarea {
+  min-height: 3.4rem;
+}
+
+.chat-composer-actions button {
+  min-width: 6.75rem;
+}
+
+#send-message {
+  min-height: 2.5rem;
+}
+
+#leave-conversation {
+  min-height: 2.4rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}

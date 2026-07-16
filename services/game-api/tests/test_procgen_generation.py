@@ -5,13 +5,8 @@ import unittest
 from pathlib import Path
 
 from app.content import load_world_content
-from app.db import (
-    connect,
-    create_dungeon_instance,
-    initialize_database,
-    load_dungeon_floor,
-    persist_dungeon_floor,
-)
+from app.db.connection import connect, initialize_database
+from app.db.dungeons import create_dungeon_instance, load_dungeon_floor, persist_dungeon_floor
 from app.procgen.generator import generate_floor
 
 
@@ -127,7 +122,7 @@ class ProcgenGenerationTests(unittest.TestCase):
                 db_path=db_path,
             )
             persist_dungeon_floor(
-                dungeon_instance_id=instance["id"],
+                dungeon_instance_id=instance.id,
                 biome_id=biome["id"],
                 floor_number=layout.floor_number,
                 floor_seed=layout.floor_seed,

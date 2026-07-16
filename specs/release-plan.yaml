@@ -1,0 +1,6 @@
+# Release plan for Sukupol
+# This file is a mirror — the real version authority is git tags / gh release view.
+release:
+  target_version: null # mirror, not the authority
+  bump_hint: minor
+epics: []

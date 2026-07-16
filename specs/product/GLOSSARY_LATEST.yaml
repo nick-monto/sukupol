@@ -1,0 +1,7 @@
+glossary:
+  run: A single playthrough session, persisted in SQLite from start to death/complete.
+  procgen: Procedural generation — deterministic map/content creation seeded by a value.
+  traversal: Moving across maps (towns, overworld, caves, dungeon floors).
+  encounter: Random combat or event triggered while traveling through encounter-enabled areas.
+  dialogue: NPC conversation system with deterministic fallback and LLM integration seam.
+  quest: Objective given by NPCs, tracked per-run (e.g., fetch quests).

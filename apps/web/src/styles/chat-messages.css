@@ -1,0 +1,119 @@
+.chat-message {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
+.chat-message.is-player {
+  justify-content: flex-end;
+}
+
+.chat-message.is-system {
+  justify-content: center;
+}
+
+.chat-bubble {
+  display: grid;
+  gap: 0.45rem;
+  width: 100%;
+  min-width: 0;
+  max-width: min(48rem, 82%);
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.viewport-chat[data-mode="combat"] .chat-bubble {
+  max-width: 100%;
+  padding: 0.8rem 0.9rem;
+}
+
+.viewport-chat[data-mode="combat"] .chat-bubble-meta {
+  gap: 0.45rem;
+}
+
+.viewport-chat[data-mode="combat"] .chat-speaker,
+.viewport-chat[data-mode="combat"] .chat-source {
+  font-size: 0.62rem;
+}
+
+.chat-message.is-npc .chat-bubble {
+  max-width: min(50rem, 84%);
+}
+
+.chat-message.is-player .chat-bubble {
+  max-width: min(38rem, 72%);
+  background: linear-gradient(180deg, rgba(214, 179, 116, 0.16), rgba(214, 179, 116, 0.08));
+  border-color: rgba(214, 179, 116, 0.24);
+}
+
+.chat-message.is-ally .chat-bubble {
+  max-width: min(44rem, 78%);
+  background: linear-gradient(180deg, rgba(152, 183, 174, 0.16), rgba(152, 183, 174, 0.07));
+  border-color: rgba(152, 183, 174, 0.24);
+}
+
+.chat-message.is-system .chat-bubble {
+  max-width: 100%;
+  background: rgba(216, 138, 121, 0.08);
+  border-color: rgba(216, 138, 121, 0.22);
+}
+
+.chat-bubble-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.chat-speaker,
+.chat-source {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.chat-speaker {
+  color: var(--accent-strong);
+}
+
+.chat-source {
+  color: var(--text-soft);
+}
+
+.chat-bubble p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.chat-message.is-streaming .chat-bubble {
+  border-color: rgba(152, 183, 174, 0.24);
+  background: linear-gradient(180deg, rgba(152, 183, 174, 0.12), rgba(255, 255, 255, 0.03));
+}
+
+.chat-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-height: 1.25rem;
+}
+
+.chat-loading span {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 999px;
+  background: rgba(214, 179, 116, 0.9);
+  animation: chat-loading-pulse 900ms ease-in-out infinite;
+}
+
+.chat-loading span:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.chat-loading span:nth-child(3) {
+  animation-delay: 240ms;
+}

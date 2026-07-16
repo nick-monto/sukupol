@@ -7,12 +7,13 @@ from ..game import RunState
 from .registry import register_agent_builder
 from .runtime import AgentInvocation
 
+from .sanitize import sanitize_prompt_input
+
 
 @dataclass(frozen=True)
 class CombatParleyContext:
     enemy_def: dict[str, Any]
     state: RunState
-    combat_state: dict[str, Any]
     negotiation: dict[str, Any]
     player_message: str = ""
     heuristic_reply: str = ""
@@ -32,11 +33,11 @@ def build_combat_parley_open_agent(context: CombatParleyContext, tools: tuple[An
             "Acknowledge that the player has opened negotiations, stay grounded in the exact combat state, and do not resolve combat or promise outcomes."
         ),
         user_prompt=(
-            f"Enemy: {context.enemy_def['name']}\n"
-            f"Enemy description: {context.enemy_def.get('description', 'unknown')}\n"
+            f"Enemy: {sanitize_prompt_input(context.enemy_def['name'])}\n"
+            f"Enemy description: {sanitize_prompt_input(str(context.enemy_def.get('description', 'unknown')))}\n"
             f"Communication mode: {context.negotiation.get('communication_mode', 'speech')}\n"
-            f"Temperament: {context.negotiation.get('temperament', 'wary')}\n"
-            f"Player: {context.state.player_name}\n"
+            f"Temperament: {sanitize_prompt_input(str(context.negotiation.get('temperament', 'wary')))}\n"
+            f"Player: {sanitize_prompt_input(context.state.player_name)}\n"
             f"Player HP: {context.state.hp}/{context.state.max_hp}\n"
             "The player has called for terms. Reply as the enemy opening the parley."
         ),
@@ -54,10 +55,10 @@ def build_combat_parley_reply_agent(context: CombatParleyContext, tools: tuple[A
             "Your reply must match the provided negotiation reaction signal exactly in tone and pressure."
         ),
         user_prompt=(
-            f"Enemy: {context.enemy_def['name']}\n"
-            f"Enemy description: {context.enemy_def.get('description', 'unknown')}\n"
-            f"Temperament: {context.negotiation.get('temperament', 'wary')}\n"
-            f"Player line: {context.player_message.strip()}\n"
+            f"Enemy: {sanitize_prompt_input(context.enemy_def['name'])}\n"
+            f"Enemy description: {sanitize_prompt_input(str(context.enemy_def.get('description', 'unknown')))}\n"
+            f"Temperament: {sanitize_prompt_input(str(context.negotiation.get('temperament', 'wary')))}\n"
+            f"Player line: {sanitize_prompt_input(context.player_message)}\n"
             f"Current active intent: {context.inferred_intent or context.negotiation.get('active_intent') or 'none'}\n"
             f"Leverage delta: {context.leverage_delta}\n"
             f"Anger delta: {context.anger_delta}\n"

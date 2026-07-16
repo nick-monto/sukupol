@@ -13,7 +13,6 @@ from .registry import register_tool_builder
 class CombatParleyToolContext:
     world: WorldContent
     state: RunState
-    combat_state: dict[str, Any]
     enemy_def: dict[str, Any]
     negotiation: dict[str, Any]
 

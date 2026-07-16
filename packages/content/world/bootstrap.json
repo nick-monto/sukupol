@@ -569,19 +569,27 @@
         "accent": "Oath-bound gatework",
         "damage_node_count": 3,
         "converse_node_count": 1,
-        "unique_obstacles": [
+        "obstacles": [
           {
-            "kind": "osseous_gate",
+            "id": "osseous_gate",
             "label": "Osseous Gate",
+            "pegs": [
+              { "angle": 0, "distance": 0, "radius": 16 },
+              { "angle": 2.09, "distance": 14, "radius": 10 }
+            ],
             "effect": "armor_shave",
-            "value": 1,
+            "effectValue": 1,
+            "scoreValue": 15,
             "detail": "A rib-latched gate that cracks the warden's defense when struck."
           },
           {
-            "kind": "oath_bell",
+            "id": "oath_bell",
             "label": "Oath Bell",
+            "pegs": [
+              { "angle": 0, "distance": 0, "radius": 20 }
+            ],
             "effect": "combo_boost",
-            "value": 1,
+            "scoreValue": 10,
             "detail": "A tolling bell that sharpens the table's rhythm."
           }
         ]
@@ -611,18 +619,25 @@
       "pinball": {
         "accent": "Heavy ward geometry",
         "damage_node_count": 3,
-        "unique_obstacles": [
+        "obstacles": [
           {
-            "kind": "shield_arch",
+            "id": "shield_arch",
             "label": "Shield Arch",
+            "pegs": [
+              { "angle": -1.57, "distance": 12, "radius": 14 },
+              { "angle": 1.57, "distance": 12, "radius": 14 }
+            ],
             "effect": "brace",
-            "value": 1
+            "scoreValue": 10
           },
           {
-            "kind": "sentinel_eye",
+            "id": "sentinel_eye",
             "label": "Sentinel Eye",
+            "pegs": [
+              { "angle": 0, "distance": 0, "radius": 18 }
+            ],
             "effect": "armor_shave",
-            "value": 1
+            "scoreValue": 15
           }
         ]
       },
@@ -651,18 +666,26 @@
       "pinball": {
         "accent": "Lunging side lanes",
         "damage_node_count": 2,
-        "unique_obstacles": [
+        "obstacles": [
           {
-            "kind": "hound_leap",
+            "id": "hound_leap",
             "label": "Hound Leap",
+            "pegs": [
+              { "angle": 0, "distance": 14, "radius": 12 },
+              { "angle": 3.14, "distance": 14, "radius": 12 }
+            ],
             "effect": "combo_boost",
-            "value": 1
+            "scoreValue": 10
           },
           {
-            "kind": "fang_rail",
+            "id": "fang_rail",
             "label": "Fang Rail",
+            "pegs": [
+              { "angle": -1.57, "distance": 12, "radius": 14 },
+              { "angle": 1.57, "distance": 12, "radius": 14 }
+            ],
             "effect": "armor_shave",
-            "value": 1
+            "scoreValue": 15
           }
         ]
       },
@@ -702,18 +725,25 @@
         "accent": "Lantern relays",
         "damage_node_count": 3,
         "converse_node_count": 2,
-        "unique_obstacles": [
+        "obstacles": [
           {
-            "kind": "moss_relay",
+            "id": "moss_relay",
             "label": "Moss Relay",
+            "pegs": [
+              { "angle": 0, "distance": 14, "radius": 12 },
+              { "angle": 3.14, "distance": 14, "radius": 12 }
+            ],
             "effect": "combo_boost",
-            "value": 1
+            "scoreValue": 10
           },
           {
-            "kind": "bronze_lantern",
+            "id": "bronze_lantern",
             "label": "Bronze Lantern",
+            "pegs": [
+              { "angle": 0, "distance": 0, "radius": 20 }
+            ],
             "effect": "brace",
-            "value": 1
+            "scoreValue": 10
           }
         ]
       },
@@ -754,18 +784,25 @@
         "accent": "Drowned ledger rails",
         "damage_node_count": 4,
         "converse_node_count": 2,
-        "unique_obstacles": [
+        "obstacles": [
           {
-            "kind": "ledger_rack",
+            "id": "ledger_rack",
             "label": "Ledger Rack",
+            "pegs": [
+              { "angle": -1.57, "distance": 14, "radius": 10 },
+              { "angle": 1.57, "distance": 14, "radius": 10 }
+            ],
             "effect": "armor_shave",
-            "value": 1
+            "scoreValue": 15
           },
           {
-            "kind": "ink_siphon",
+            "id": "ink_siphon",
             "label": "Ink Siphon",
+            "pegs": [
+              { "angle": 0, "distance": 0, "radius": 18 }
+            ],
             "effect": "combo_boost",
-            "value": 1
+            "scoreValue": 10
           }
         ]
       },
@@ -794,18 +831,25 @@
       "pinball": {
         "accent": "Leeching gutters",
         "damage_node_count": 2,
-        "unique_obstacles": [
+        "obstacles": [
           {
-            "kind": "silt_gutter",
+            "id": "silt_gutter",
             "label": "Silt Gutter",
+            "pegs": [
+              { "angle": -1.57, "distance": 14, "radius": 10 },
+              { "angle": 1.57, "distance": 14, "radius": 10 }
+            ],
             "effect": "brace",
-            "value": 1
+            "scoreValue": 10
           },
           {
-            "kind": "ledger_pocket",
+            "id": "ledger_pocket",
             "label": "Ledger Pocket",
+            "pegs": [
+              { "angle": 0, "distance": 0, "radius": 18 }
+            ],
             "effect": "combo_boost",
-            "value": 1
+            "scoreValue": 10
           }
         ]
       },
@@ -841,18 +885,26 @@
         "accent": "Silt jaws and false reliquaries",
         "damage_node_count": 3,
         "converse_node_count": 1,
-        "unique_obstacles": [
+        "obstacles": [
           {
-            "kind": "silt_jaw",
+            "id": "silt_jaw",
             "label": "Silt Jaw",
+            "pegs": [
+              { "angle": 0, "distance": 0, "radius": 16 },
+              { "angle": 2.09, "distance": 14, "radius": 10 }
+            ],
             "effect": "armor_shave",
-            "value": 2
+            "effectValue": 2,
+            "scoreValue": 30
           },
           {
-            "kind": "false_reliquary",
+            "id": "false_reliquary",
             "label": "False Reliquary",
+            "pegs": [
+              { "angle": 0, "distance": 0, "radius": 20 }
+            ],
             "effect": "combo_boost",
-            "value": 1
+            "scoreValue": 10
           }
         ]
       },

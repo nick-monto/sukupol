@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from typing import Any, Callable
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 AgentBuilder = Callable[..., Any]
-ToolBuilder = Callable[..., tuple[Any, ...]]
+ToolFunc = Callable[[], str]
+ToolBuilder = Callable[..., tuple[ToolFunc, ...]]
 
 
 _AGENT_BUILDERS: dict[str, AgentBuilder] = {}
@@ -22,12 +26,14 @@ def register_tool_builder(name: str, builder: ToolBuilder) -> None:
 def build_agent(name: str, *args: Any, **kwargs: Any) -> Any:
     if name not in _AGENT_BUILDERS:
         raise KeyError(f"Unknown agent builder: {name}")
+    logger.debug("agent_tool_registered", extra={"name": name, "kind": "agent"})
     return _AGENT_BUILDERS[name](*args, **kwargs)
 
 
-def build_tools(name: str, *args: Any, **kwargs: Any) -> tuple[Any, ...]:
+def build_tools(name: str, *args: Any, **kwargs: Any) -> tuple[ToolFunc, ...]:
     if name not in _TOOL_BUILDERS:
-        return ()
+        raise KeyError(f"unknown tool: {name}")
+    logger.debug("agent_tool_registered", extra={"name": name, "kind": "tool"})
     return _TOOL_BUILDERS[name](*args, **kwargs)
 
 

@@ -6,6 +6,8 @@ from typing import Any
 from .registry import register_agent_builder
 from .runtime import AgentInvocation
 
+from .sanitize import sanitize_prompt_input
+
 
 JOURNAL_SUMMARY_AGENT_NAME = "Journal Summary"
 
@@ -34,10 +36,10 @@ def build_exchange_summary_agent(context: ExchangeSummaryContext, tools: tuple[A
             "summary must be a compact memory for this player and NPC. lore_updates must be an array of objects with category and content for durable non-player-specific facts only."
         ),
         user_prompt=(
-            f"NPC: {context.npc['display_name']}\n"
-            f"Prior memory: {context.prior_summary or 'none'}\n"
-            f"Player said: {context.player_message.strip()}\n"
-            f"NPC replied: {context.reply_text.strip()}\n"
+            f"NPC: {sanitize_prompt_input(context.npc['display_name'])}\n"
+            f"Prior memory: {sanitize_prompt_input(context.prior_summary) or 'none'}\n"
+            f"Player said: {sanitize_prompt_input(context.player_message)}\n"
+            f"NPC replied: {sanitize_prompt_input(context.reply_text)}\n"
             "Do not include ephemeral phrasing or duplicate persona facts already obvious from the character description."
         ),
         tools=tools,
@@ -65,8 +67,8 @@ def build_visit_summary_prompt(npc: dict[str, Any], visit: dict[str, Any], visit
     for index, turn in enumerate(turns[-8:], start=max(len(turns) - 7, 1)):
         if not isinstance(turn, dict):
             continue
-        player_message = str(turn.get("player_message", "")).strip()
-        npc_reply = str(turn.get("npc_reply", "")).strip()
+        player_message = sanitize_prompt_input(str(turn.get("player_message", "")))
+        npc_reply = sanitize_prompt_input(str(turn.get("npc_reply", "")))
         if not player_message and not npc_reply:
             continue
         formatted_turns.append(
@@ -75,10 +77,10 @@ def build_visit_summary_prompt(npc: dict[str, Any], visit: dict[str, Any], visit
 
     transcript = "\n\n".join(formatted_turns) or "No transcript available."
     return (
-        f"NPC: {npc.get('display_name', visit.get('npc_name', 'Unknown contact'))}\n"
-        f"Role: {npc.get('role', 'contact')}\n"
-        f"Visit started: {visit.get('started_at') or 'unknown'}\n"
-        f"Visit ended: {visit_ended_at}\n"
+        f"NPC: {sanitize_prompt_input(str(npc.get('display_name', visit.get('npc_name', 'Unknown contact'))))}\n"
+        f"Role: {sanitize_prompt_input(str(npc.get('role', 'contact')))}\n"
+        f"Visit started: {sanitize_prompt_input(str(visit.get('started_at') or 'unknown'))}\n"
+        f"Visit ended: {sanitize_prompt_input(visit_ended_at)}\n"
         f"Turn count: {len(turns)}\n\n"
         f"Transcript:\n{transcript}"
     )

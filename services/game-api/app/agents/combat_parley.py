@@ -34,13 +34,11 @@ class CombatParleyService:
             context=CombatParleyContext(
                 enemy_def=enemy_def,
                 state=state,
-                combat_state=combat_state,
                 negotiation=negotiation,
             ),
             tool_context=CombatParleyToolContext(
                 world=world,
                 state=state,
-                combat_state=combat_state,
                 enemy_def=enemy_def,
                 negotiation=negotiation,
             ),
@@ -63,7 +61,6 @@ class CombatParleyService:
             context=CombatParleyContext(
                 enemy_def=enemy_def,
                 state=state,
-                combat_state=combat_state,
                 negotiation=negotiation,
                 player_message=player_message,
                 heuristic_reply=fallback,
@@ -76,7 +73,6 @@ class CombatParleyService:
             tool_context=CombatParleyToolContext(
                 world=world,
                 state=state,
-                combat_state=combat_state,
                 enemy_def=enemy_def,
                 negotiation=negotiation,
             ),

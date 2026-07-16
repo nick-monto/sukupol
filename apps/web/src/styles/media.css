@@ -1,0 +1,192 @@
+@media (max-width: 1080px) {
+  body {
+    overflow: auto;
+  }
+
+  #app,
+  .shell,
+  .viewport-root {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+
+  .hero-band,
+  .grid-secondary {
+    grid-template-columns: 1fr;
+  }
+
+  .support-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .viewport-root {
+    --overlay-gap: 0.8rem;
+    --left-rail-width: min(22rem, calc(100vw - 1.6rem));
+    --right-rail-width: min(24rem, calc(100vw - 1.6rem));
+  }
+
+  .hero-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .viewport-left-rail {
+    width: min(var(--left-rail-width), calc(50vw - 1.2rem));
+    bottom: calc(11rem + var(--overlay-gap));
+  }
+
+  .viewport-bottom-bar {
+    left: var(--overlay-gap);
+    right: calc(var(--right-rail-width) + (var(--overlay-gap) * 2));
+    justify-content: flex-start;
+  }
+
+  .viewport-controls-overlay {
+    max-width: none;
+  }
+
+  .outcome-overlay {
+    display: none;
+  }
+
+  .panel-header-tools {
+    justify-items: start;
+  }
+
+  .panel-note,
+  .location-meta {
+    max-width: none;
+    text-align: left;
+  }
+
+  .chat-composer-row,
+  .chat-composer-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .viewport-chat {
+    height: min(56vh, 36rem);
+    max-height: none;
+  }
+
+  .chat-message.is-npc .chat-bubble,
+  .chat-message.is-player .chat-bubble {
+    max-width: 100%;
+  }
+
+  .combat-party-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .viewport[data-mode="combat"] .viewport-pixi-stage {
+    min-height: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  body {
+    overflow: hidden;
+  }
+
+  #app,
+  .shell,
+  .viewport-root {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+
+  .hero,
+  .panel {
+    padding: 0.9rem;
+    border-radius: 14px;
+  }
+
+  .hero-top,
+  .panel-header,
+  .panel-header-tools,
+  .npc-item,
+  .inventory-item {
+    display: grid;
+  }
+
+  .hero-actions {
+    justify-content: start;
+  }
+
+  .hero-summary,
+  .controls,
+  .combat-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .viewport-root {
+    --overlay-gap: 0.55rem;
+  }
+
+  .viewport-left-rail {
+    top: 0.55rem;
+    left: 0.55rem;
+    right: 0.55rem;
+    bottom: auto;
+    width: auto;
+    max-height: 46vh;
+    overflow: auto;
+  }
+
+  .viewport-chat-overlay {
+    right: 0.55rem;
+    left: 0.55rem;
+    top: auto;
+    bottom: 4.8rem;
+    width: auto;
+    height: min(36vh, 22rem);
+  }
+
+  .viewport-bottom-bar {
+    left: 0.55rem;
+    right: 0.55rem;
+    bottom: 0.55rem;
+    gap: 0.75rem;
+  }
+
+  .viewport-controls-overlay {
+    width: 100%;
+    padding: 0.55rem;
+  }
+
+  .combat-overlay-shell {
+    padding: 0.7rem;
+  }
+
+  .combat-overlay-header,
+  .combat-overlay-readout,
+  .combat-overlay-hud-head,
+  .combat-party-card-head,
+  .combat-party-meter-copy {
+    display: grid;
+    justify-content: stretch;
+  }
+
+  .combat-overlay-enemy-card {
+    min-width: 100%;
+    padding: 0.9rem 1rem;
+  }
+
+  .combat-overlay-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .viewport-chat {
+    height: 100%;
+    min-height: 0;
+    padding-inline: 0.85rem;
+  }
+
+  .viewport-location-card,
+  .viewport-dock-card {
+    padding-inline: 0.85rem;
+  }
+
+  .entity-ascii {
+    min-width: 0;
+  }
+}

@@ -1,0 +1,14 @@
+project: sukupol
+description: Browser-based ASCII rogue-lite with map traversal, seeded dungeons, and database-backed content.
+workflow_mode: team-pr
+git:
+  branch: qwen-testing
+  remote: origin
+release:
+  last_tag: null
+metrics:
+  story_start: null
+handoff:
+  next_skill: survey-context
+last_session:
+  initialized: "2026-07-06"

@@ -1,0 +1,184 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
+:root {
+  color-scheme: dark;
+  --bg-base: #0b1013;
+  --bg-top: #141b20;
+  --panel: rgba(15, 21, 26, 0.9);
+  --panel-strong: rgba(10, 15, 19, 0.96);
+  --panel-soft: rgba(21, 28, 33, 0.72);
+  --line: rgba(183, 191, 183, 0.14);
+  --line-strong: rgba(214, 179, 116, 0.28);
+  --text: #ecece4;
+  --text-dim: #b6bcb7;
+  --text-soft: #7d8988;
+  --accent: #d6b374;
+  --accent-strong: #f1d8ac;
+  --signal: #98b7ae;
+  --danger: #d88a79;
+  --shadow: 0 18px 52px rgba(0, 0, 0, 0.26);
+  --viewport-background-top: #060606;
+  --viewport-background-bottom: #010101;
+  --viewport-exploration-glow: rgba(84, 255, 118, 0.05);
+  --viewport-combat-glow: rgba(185, 52, 42, 0.12);
+  --viewport-wall: #f7f7ff;
+  --viewport-side-wall: #f7f7ff;
+  --viewport-perspective: #f7f7ff;
+  --viewport-floor: #f1fff0;
+  --viewport-focus: #fbfff6;
+  --viewport-npc: #8cc3b3;
+  --viewport-creature: #ffb79c;
+  --viewport-default: #f4f4ff;
+  --viewport-line-core: #f7f7ff;
+  --viewport-line-halo: rgba(215, 255, 226, 0.12);
+  --viewport-line-glow: rgba(82, 255, 110, 0.08);
+  --viewport-artifact-magenta: rgba(255, 78, 232, 0.72);
+  --viewport-artifact-green: rgba(98, 255, 116, 0.76);
+  --viewport-frame-fill: rgba(0, 0, 0, 0.94);
+  --viewport-frame-border: rgba(255, 255, 255, 0.74);
+  --viewport-frame-glow: rgba(109, 255, 150, 0.12);
+  --viewport-floor-shadow-start: rgba(255, 255, 255, 0.02);
+  --viewport-floor-shadow-end: rgba(6, 24, 6, 0.18);
+  --viewport-focus-glow: rgba(115, 255, 148, 0.48);
+  --viewport-combat-glyph: #ffd3c2;
+  --viewport-combat-focus: #ffe2d6;
+  --viewport-combat-creature: #fff1cb;
+  --viewport-combat-band: rgba(44, 10, 14, 0.74);
+  --viewport-combat-border: rgba(255, 167, 143, 0.44);
+  --viewport-combat-text: #ffe4d8;
+  --viewport-combat-artifact-left: rgba(255, 148, 127, 0.7);
+  --viewport-combat-artifact-right: rgba(255, 214, 176, 0.66);
+  --viewport-combat-halo: rgba(255, 124, 102, 0.17);
+  --viewport-combat-glow-line: rgba(255, 104, 84, 0.1);
+  --viewport-combat-frame-glow: rgba(255, 130, 110, 0.22);
+  --viewport-combat-floor-shadow-end: rgba(40, 8, 8, 0.22);
+  --viewport-cue-path-fill: rgba(255, 219, 122, 0.14);
+  --viewport-cue-path-stroke: rgba(255, 223, 151, 0.62);
+  --viewport-cue-panel-fill: rgba(31, 26, 11, 0.82);
+  --viewport-cue-panel-text: #fff0c4;
+  --viewport-cue-threshold-text: #fff1cd;
+  --viewport-cue-threshold-exit-fill: rgba(78, 63, 20, 0.22);
+  --viewport-cue-threshold-exit-stroke: rgba(240, 206, 120, 0.74);
+  --viewport-cue-threshold-return-fill: rgba(24, 70, 74, 0.24);
+  --viewport-cue-threshold-return-stroke: rgba(146, 215, 226, 0.74);
+  --viewport-cue-threshold-descent-fill: rgba(92, 69, 18, 0.24);
+  --viewport-cue-threshold-descent-stroke: rgba(255, 219, 122, 0.76);
+  --viewport-cue-blocked-fill: rgba(100, 29, 21, 0.34);
+  --viewport-cue-blocked-stroke: rgba(255, 141, 124, 0.78);
+  --viewport-cue-blocked-text: #ffe1da;
+  --viewport-cue-friendly-fill: rgba(44, 90, 78, 0.3);
+  --viewport-cue-friendly-stroke: rgba(149, 215, 196, 0.74);
+  --viewport-cue-friendly-text: #e8fff6;
+  --viewport-cue-hostile-fill: rgba(142, 34, 26, 0.32);
+  --viewport-cue-hostile-stroke: rgba(255, 166, 133, 0.7);
+  --viewport-cue-hostile-text: #ffe5da;
+  --map-background-top: #11181d;
+  --map-background-bottom: #05080c;
+  --map-wall: #f0d093;
+  --map-floor: #8d9ea7;
+  --map-decor: #78a98d;
+  --map-exit: #8cc3b3;
+  --map-player: #fff4d2;
+  --map-npc: #ffb79c;
+  font-family: "IBM Plex Mono", monospace;
+  line-height: 1.5;
+  font-weight: 400;
+  background:
+    radial-gradient(circle at top left, rgba(214, 179, 116, 0.08), transparent 28%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-base) 100%);
+  color: var(--text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(214, 179, 116, 0.08), transparent 24%),
+    radial-gradient(circle at 82% 0%, rgba(152, 183, 174, 0.06), transparent 18%),
+    linear-gradient(180deg, #12191e 0%, #0a0f13 100%);
+  color: var(--text);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(rgba(255, 255, 255, 0.012), rgba(255, 255, 255, 0.012));
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(214, 179, 116, 0.24);
+  background: rgba(214, 179, 116, 0.08);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.76rem;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease,
+    color 180ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(241, 216, 172, 0.5);
+  background: rgba(214, 179, 116, 0.12);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+input,
+textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(8, 12, 15, 0.92);
+  color: var(--text);
+  padding: 0.95rem 1rem;
+}
+
+textarea {
+  min-height: 9rem;
+  resize: vertical;
+}
+
+textarea:focus,
+button:focus-visible {
+  outline: 2px solid rgba(241, 216, 172, 0.45);
+  outline-offset: 2px;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}

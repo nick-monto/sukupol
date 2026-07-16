@@ -5,6 +5,8 @@ from typing import Any
 
 from .quest_agents import QuestOfferContext, QuestResponseContext
 from .registry import build_agent
+from .validate import validate_authored_text
+
 from .runtime import AgentExecutor
 
 
@@ -41,15 +43,12 @@ class QuestGenerationService:
         return response_text or None
 
     def _normalize_offer_payload(self, payload: dict[str, Any]) -> dict[str, str] | None:
-        title = str(payload.get("title", "")).strip()
-        summary = str(payload.get("summary", "")).strip()
-        objective_text = str(payload.get("objective_text", "")).strip()
-        offer_text = str(payload.get("offer_text", "")).strip()
-        if not title or not summary or not objective_text or not offer_text:
-            return None
-        return {
-            "title": title,
-            "summary": summary,
-            "objective_text": objective_text,
-            "offer_text": offer_text,
-        }
+        LENS = {"title": 80, "summary": 200, "objective_text": 200, "offer_text": 400}
+        validated: dict[str, str] = {}
+        for key in ("title", "summary", "objective_text", "offer_text"):
+            raw = str(payload.get(key, ""))
+            result = validate_authored_text(raw, max_len=LENS[key])
+            if result is None:
+                return None
+            validated[key] = result
+        return validated

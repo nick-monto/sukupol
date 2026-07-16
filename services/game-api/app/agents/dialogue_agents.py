@@ -7,6 +7,8 @@ from ..game import RunState
 from .registry import register_agent_builder
 from .runtime import AgentInvocation
 
+from .sanitize import sanitize_prompt_input
+
 
 @dataclass(frozen=True)
 class NpcDialogueTurnContext:
@@ -81,16 +83,19 @@ def build_dialogue_user_prompt(
     player_memory: dict[str, str],
     shared_knowledge: list[dict[str, Any]],
 ) -> str:
-    knowledge_text = "\n".join(f"- {entry['category']}: {entry['content']}" for entry in shared_knowledge[:6])
+    knowledge_text = "\n".join(
+        f"- {sanitize_prompt_input(str(entry.get('category', '')))}: {sanitize_prompt_input(str(entry.get('content', '')))}"
+        for entry in shared_knowledge[:6]
+    )
     return (
-        f"Player: {state.player_name}\n"
+        f"Player: {sanitize_prompt_input(state.player_name)}\n"
         f"Location: {state.location_id}\n"
         f"Depth reached: {state.run_depth}\n"
         f"HP: {state.hp}/{state.max_hp}\n"
         f"Gold: {state.gold}\n"
-        f"Prior memory: {player_memory.get('summary', '') or 'none'}\n"
+        f"Prior memory: {sanitize_prompt_input(player_memory.get('summary', '') or 'none')}\n"
         f"Shared knowledge:\n{knowledge_text or '- none'}\n\n"
-        f"Player message: {player_message.strip()}\n\n"
+        f"Player message: {sanitize_prompt_input(player_message)}\n\n"
         "Keep the reply compact and natural.\n"
         "Respond as JSON only."
     )
@@ -102,16 +107,19 @@ def build_stream_dialogue_user_prompt(
     player_memory: dict[str, str],
     shared_knowledge: list[dict[str, Any]],
 ) -> str:
-    knowledge_text = "\n".join(f"- {entry['category']}: {entry['content']}" for entry in shared_knowledge[:6])
+    knowledge_text = "\n".join(
+        f"- {sanitize_prompt_input(str(entry.get('category', '')))}: {sanitize_prompt_input(str(entry.get('content', '')))}"
+        for entry in shared_knowledge[:6]
+    )
     return (
-        f"Player: {state.player_name}\n"
+        f"Player: {sanitize_prompt_input(state.player_name)}\n"
         f"Location: {state.location_id}\n"
         f"Depth reached: {state.run_depth}\n"
         f"HP: {state.hp}/{state.max_hp}\n"
         f"Gold: {state.gold}\n"
-        f"Prior memory: {player_memory.get('summary', '') or 'none'}\n"
+        f"Prior memory: {sanitize_prompt_input(player_memory.get('summary', '') or 'none')}\n"
         f"Shared knowledge:\n{knowledge_text or '- none'}\n\n"
-        f"Player message: {player_message.strip()}\n\n"
+        f"Player message: {sanitize_prompt_input(player_message)}\n\n"
         "Keep the reply compact and natural.\n"
         "Respond with plain in-character prose only."
     )

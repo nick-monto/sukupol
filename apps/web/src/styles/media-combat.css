@@ -1,0 +1,268 @@
+  .combat-overlay {
+    z-index: 12;
+    pointer-events: none;
+    background: none;
+  }
+
+  .shell[data-mode="combat"] .viewport-top-hud,
+  .shell[data-mode="combat"] .viewport-bottom-bar,
+  .shell[data-mode="combat"] .journal-overlay-card,
+  .shell[data-mode="combat"] .map-overlay-card {
+    display: none !important;
+  }
+
+  .shell[data-mode="combat"] .viewport-root {
+    --combat-gap: 16px;
+    --combat-side-width: 340px;
+    --combat-bottom-height: 132px;
+    --combat-side-top-height: 356px;
+  }
+
+  .shell[data-mode="combat"] .viewport-chat-overlay {
+    display: grid !important;
+    top: calc(var(--combat-gap) + var(--combat-side-top-height) + var(--combat-gap));
+    right: var(--combat-gap);
+    bottom: calc(var(--combat-gap) + var(--combat-bottom-height) + var(--combat-gap));
+    left: auto;
+    width: var(--combat-side-width);
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    z-index: 13;
+  }
+
+  .shell[data-mode="combat"] .viewport-chat {
+    grid-template-rows: minmax(0, 1fr) auto;
+    height: 100%;
+    min-height: 0;
+    padding: 0.95rem;
+    border-radius: 24px;
+    border-width: 2px;
+    background: linear-gradient(180deg, rgba(15, 16, 18, 0.96) 0%, rgba(7, 8, 10, 0.99) 100%);
+  }
+
+  .shell[data-mode="combat"] .viewport-chat-resize-handle,
+  .shell[data-mode="combat"] .viewport-chat-roster,
+  .shell[data-mode="combat"] .viewport-chat-contacts {
+    display: none;
+  }
+
+  .shell[data-mode="combat"] .viewport-chat-stage {
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .shell[data-mode="combat"] .viewport-chat .chat-transcript {
+    min-height: 0;
+    padding: 0.9rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .shell[data-mode="combat"] .viewport-chat-compose {
+    margin-top: 0.65rem;
+  }
+
+  .shell[data-mode="combat"] .inventory-overlay-card {
+    display: grid !important;
+    left: var(--combat-gap);
+    right: var(--combat-gap);
+    bottom: var(--combat-gap);
+    width: auto;
+    max-height: none;
+    min-height: var(--combat-bottom-height);
+    padding: 0.9rem 1rem;
+    z-index: 13;
+    border-radius: 24px;
+    border: 2px solid rgba(255, 236, 214, 0.12);
+    background: linear-gradient(180deg, rgba(15, 16, 18, 0.96) 0%, rgba(7, 8, 10, 0.99) 100%);
+  }
+
+  .shell[data-mode="combat"] .inventory-overlay-card .panel-header {
+    margin-bottom: 0.7rem;
+  }
+
+  .shell[data-mode="combat"] .inventory-overlay-card .inventory-list {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(13rem, 1fr);
+    gap: 0.75rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.15rem;
+  }
+
+  .shell[data-mode="combat"] .inventory-overlay-card .inventory-item {
+    min-width: 0;
+    min-height: 4.75rem;
+  }
+
+  .shell[data-mode="combat"] .viewport-pixi-stage canvas {
+    filter: none;
+    transform: none;
+  }
+
+  @media (max-width: 1080px) {
+    .viewport-top-hud {
+      gap: 0.65rem;
+    }
+
+    .area-banner {
+      min-width: 0;
+      width: 100%;
+    }
+
+    .journal-overlay-card,
+    .map-overlay-card {
+      width: min(48rem, calc(100vw - 2rem));
+    }
+
+    .viewport-chat-overlay {
+      width: min(38rem, calc(100vw - 2rem));
+      height: min(34rem, 64vh);
+      min-height: 22rem;
+      max-height: min(34rem, 64vh);
+    }
+
+    .shell[data-mode="combat"] .viewport-root {
+      --combat-side-width: 286px;
+      --combat-bottom-height: 122px;
+      --combat-side-top-height: 332px;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .launch-panel-shell {
+      padding: 0.65rem;
+    }
+
+    .launch-panel-card {
+      width: calc(100vw - 1.3rem);
+      padding: 1rem;
+    }
+
+    .launch-panel-card h1 {
+      font-size: 1.8rem;
+    }
+
+    .viewport-top-hud {
+      top: 0.65rem;
+      left: 0.65rem;
+      right: 0.65rem;
+      gap: 0.5rem;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .hud-toggle-corner {
+      min-width: 5.6rem;
+      min-height: 2.7rem;
+      padding: 0.7rem 0.8rem;
+      font-size: 0.68rem;
+    }
+
+    .area-banner {
+      padding: 0.7rem 0.8rem;
+    }
+
+    .area-banner h2 {
+      font-size: 1rem;
+      max-width: 12rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .journal-overlay-card,
+    .map-overlay-card,
+    .inventory-overlay-card {
+      left: 0.65rem;
+      right: 0.65rem;
+      width: auto;
+      max-height: 42vh;
+    }
+
+    .journal-overlay-card,
+    .map-overlay-card {
+      top: 4.5rem;
+    }
+
+    .inventory-overlay-card {
+      bottom: 4.85rem;
+    }
+
+    .viewport-chat-overlay {
+      inset: auto 0.65rem 4.85rem 0.65rem;
+      height: min(56vh, 28rem);
+      min-height: 18rem;
+    }
+
+    .viewport-chat-stage {
+      min-height: 12rem;
+    }
+
+    .viewport-chat .chat-transcript {
+      min-height: 11.5rem;
+    }
+
+    .npc-tab {
+      min-width: 8rem;
+    }
+
+    .shell[data-mode="combat"] .viewport-root {
+      --combat-gap: 10px;
+      --combat-side-width: calc(100vw - 20px);
+      --combat-bottom-height: 178px;
+      --combat-side-top-height: 258px;
+    }
+
+    .shell[data-mode="combat"] .combat-overlay {
+      justify-items: stretch;
+    }
+
+    .shell[data-mode="combat"] .combat-cabinet-sidecard {
+      padding: 0.85rem;
+    }
+
+    .shell[data-mode="combat"] .combat-cabinet-hp-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .shell[data-mode="combat"] .viewport-chat-overlay {
+      top: calc(var(--combat-gap) + var(--combat-side-top-height) + var(--combat-gap));
+      left: var(--combat-gap);
+      right: var(--combat-gap);
+      width: auto;
+      bottom: calc(var(--combat-gap) + var(--combat-bottom-height) + var(--combat-gap));
+      height: auto;
+    }
+
+    .shell[data-mode="combat"] .inventory-overlay-card {
+      left: var(--combat-gap);
+      right: var(--combat-gap);
+      bottom: var(--combat-gap);
+      min-height: var(--combat-bottom-height);
+      padding: 0.8rem 0.85rem;
+    }
+
+    .shell[data-mode="combat"] .inventory-overlay-card .inventory-list {
+      grid-auto-columns: minmax(10.5rem, 1fr);
+    }
+
+    .viewport-bottom-bar {
+      left: 0.65rem;
+      right: 0.65rem;
+      bottom: 0.65rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .viewport-controls-overlay {
+      width: 100%;
+    }
+
+    .viewport-controls {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
