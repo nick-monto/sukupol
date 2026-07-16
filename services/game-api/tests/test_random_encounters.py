@@ -7,7 +7,8 @@ from pathlib import Path
 
 from app.combat import maybe_start_encounter
 from app.content import load_world_content
-from app.db import connect, load_dungeon_floor
+from app.db.connection import connect
+from app.db.dungeons import load_dungeon_floor
 from app.game import create_run, encounter_context_for_location
 
 
@@ -37,6 +38,7 @@ class RandomEncounterTests(unittest.TestCase):
 
         maybe_start_encounter(self.world, state, moved=True)
 
+        assert state.combat_state is not None
         self.assertTrue(state.in_combat)
         self.assertIsNotNone(state.combat_state)
         self.assertEqual("engaged", state.combat_state["status"])
@@ -166,7 +168,9 @@ class RandomEncounterTests(unittest.TestCase):
                 )
                 connection.commit()
 
-            return load_dungeon_floor("dungeon:test-floor:1", db_path=db_path)
+            result = load_dungeon_floor("dungeon:test-floor:1", db_path=db_path)
+            assert result is not None
+            return result
 
 
 

@@ -1,0 +1,287 @@
+/* ── Sidecard scrollable log ── */
+.combat-sidecard-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.22);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+.combat-log-empty {
+  margin: 0;
+  opacity: 0.55;
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+.combat-log-entry {
+  font-size: 0.77rem;
+  line-height: 1.45;
+  padding: 0.28rem 0.4rem;
+  border-radius: 6px;
+  color: var(--viewport-combat-text);
+}
+
+.combat-log-entry.is-player,
+.combat-log-entry.is-impact {
+  background: rgba(214, 179, 116, 0.07);
+  border-left: 2px solid rgba(214, 179, 116, 0.4);
+}
+
+.combat-log-entry.is-enemy,
+.combat-log-entry.is-warning {
+  background: rgba(216, 80, 60, 0.07);
+  border-left: 2px solid rgba(216, 80, 60, 0.4);
+}
+
+.combat-log-entry.is-system {
+  opacity: 0.65;
+  font-style: italic;
+}
+
+.combat-cabinet-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.combat-cabinet-status-grid .combat-stat-pill {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.combat-cabinet-sidecopy {
+  display: grid;
+  gap: 0.22rem;
+  padding-top: 0.1rem;
+}
+
+.combat-cabinet-sidecopy p {
+  margin: 0;
+}
+
+.combat-overlay-stage > * {
+  min-height: 0;
+}
+
+.combat-overlay-enemy-card {
+  display: grid;
+  gap: 0.55rem;
+  justify-items: center;
+  min-width: min(100%, 30rem);
+  padding: 0.75rem 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--viewport-combat-border);
+  background:
+    radial-gradient(circle at top, var(--viewport-combat-halo), transparent 58%),
+    linear-gradient(180deg, rgba(22, 7, 8, 0.84) 0%, rgba(11, 3, 4, 0.9) 100%);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.32),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.negotiation-card {
+  display: grid;
+  align-content: start;
+  min-height: 0;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 228, 216, 0.16);
+  background: linear-gradient(180deg, rgba(39, 18, 18, 0.9), rgba(17, 10, 11, 0.94));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+.negotiation-card.is-active {
+  border-color: rgba(255, 216, 172, 0.3);
+}
+
+.negotiation-card.is-locked {
+  border-color: rgba(216, 138, 121, 0.3);
+}
+
+.negotiation-card-head,
+.negotiation-readout {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.negotiation-card-head strong {
+  text-transform: capitalize;
+}
+
+.negotiation-copy,
+.negotiation-empty {
+  margin: 0;
+}
+
+.negotiation-options,
+.negotiation-transcript {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.negotiation-transcript {
+  display: grid;
+  gap: 0.45rem;
+  min-height: 0;
+  overflow: auto;
+}
+
+.negotiation-option-pill,
+.negotiation-speaker {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.negotiation-option-pill.is-muted {
+  opacity: 0.6;
+}
+
+.negotiation-entry {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.negotiation-entry.is-player {
+  border-color: rgba(214, 179, 116, 0.18);
+}
+
+.negotiation-entry.is-enemy {
+  border-color: rgba(216, 138, 121, 0.2);
+}
+
+.combat-overlay-enemy-copy {
+  display: grid;
+  gap: 0.3rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.combat-overlay-enemy-copy strong {
+  font-family: "Fraunces", serif;
+  font-size: clamp(1.2rem, 2vw, 1.8rem);
+}
+
+.combat-enemy-stats {
+  justify-content: center;
+  color: rgba(255, 228, 216, 0.86);
+  font-size: 0.82rem;
+}
+
+.combat-overlay-art,
+.combat-overlay-sigil {
+  min-width: 14ch;
+  min-height: 0;
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 228, 216, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--viewport-combat-creature);
+  text-align: center;
+  text-shadow: 0 0 18px rgba(255, 183, 156, 0.22);
+}
+
+.combat-overlay-sigil {
+  display: grid;
+  place-items: center;
+  min-width: 4.25rem;
+  min-height: 4.25rem;
+  font-family: "Fraunces", serif;
+  font-size: 1.9rem;
+}
+
+.combat-overlay-hud {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.55rem 0.7rem 0.7rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 170, 146, 0.18);
+  background:
+    linear-gradient(180deg, rgba(28, 7, 8, 0.82) 0%, rgba(12, 4, 5, 0.92) 100%),
+    rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.combat-overlay-hud-head {
+  align-items: end;
+}
+
+.combat-party-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.combat-party-card {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.55rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.combat-party-card.is-player {
+  border-color: rgba(241, 216, 172, 0.24);
+  background: linear-gradient(180deg, rgba(214, 179, 116, 0.12), rgba(255, 255, 255, 0.04));
+}
+
+.combat-party-card.is-reserve {
+  border-style: dashed;
+  opacity: 0.76;
+}
+
+.combat-party-card strong {
+  display: block;
+  margin-top: 0.08rem;
+}
+
+.combat-party-meter {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.combat-party-meter-bar {
+  width: 100%;
+  height: 0.48rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.combat-party-meter-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(255, 177, 141, 0.88), rgba(255, 226, 180, 0.92));
+}
+
+.combat-party-meter-copy {
+  color: rgba(255, 228, 216, 0.78);
+  font-size: 0.66rem;
+}

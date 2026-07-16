@@ -1,0 +1,13 @@
+{
+  "include": ["app"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "typeCheckingMode": "basic",
+  "pythonVersion": "3.11",
+  "reportMissingParameterType": "error",
+  "reportMissingTypeArgument": "warning",
+  "reportUnusedImport": "warning",
+  "reportPossiblyUnboundVariable": "error",
+
+  "ignore": ["data"]
+}

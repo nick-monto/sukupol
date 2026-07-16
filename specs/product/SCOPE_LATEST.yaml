@@ -1,0 +1,11 @@
+product: sukupol
+type: browser game
+description: >
+  A browser-based ASCII rogue-lite with map-based traversal, an overworld,
+  seeded dungeons, and database-backed content and progression.
+current_scope:
+  - Server-authoritative simulation (movement, transitions, encounters)
+  - Deterministic procedural generation for dungeon floors
+  - NPC dialogue system with seeded quest variants
+  - SQLite persistence for runs, maps, and dialogue summaries
+  - LLM-integrated NPC dialogue seam (local model adapter)

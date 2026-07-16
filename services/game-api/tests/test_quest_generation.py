@@ -4,7 +4,8 @@ import unittest
 
 from app.agents import AgentExecutor, QuestGenerationService
 from app.content import load_world_content
-from app.db import ensure_player_profile, initialize_database, save_run_snapshot
+from app.db.connection import initialize_database
+from app.db.runs import ensure_player_profile, save_run_snapshot
 from app.game import create_run, state_to_dict
 from app.quests import accept_offered_quest, maybe_complete_quest_turn_in, maybe_offer_conversation_quest
 
@@ -48,6 +49,7 @@ class QuestGenerationTests(unittest.TestCase):
             quest_generation_service=self.quest_service,
         )
 
+        assert offered is not None
         self.assertIsNotNone(offered)
         self.assertEqual("Recover Marta's Satchel", offered["title"])
         self.assertEqual("Marta wants her satchel recovered from the flooded archive.", offered["summary"])
@@ -62,6 +64,7 @@ class QuestGenerationTests(unittest.TestCase):
             "Do you need help finding something?",
             quest_generation_service=self.quest_service,
         )
+        assert offered is not None
         self.assertIsNotNone(offered)
 
         accepted = accept_offered_quest(
@@ -80,6 +83,7 @@ class QuestGenerationTests(unittest.TestCase):
             self.npc["id"],
             quest_generation_service=self.quest_service,
         )
+        assert completed is not None
         self.assertIsNotNone(completed)
         self.assertEqual("Then we have terms. Bring it back to me.", completed["response_text"])
 

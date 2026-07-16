@@ -1,0 +1,82 @@
+.quest-list,
+.quest-choice-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.quest-card,
+.quest-choice-card {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(13, 18, 22, 0.94) 0%, rgba(10, 14, 17, 0.94) 100%);
+}
+
+.quest-card.is-offered,
+.quest-choice-card {
+  border-color: rgba(214, 179, 116, 0.28);
+}
+
+.quest-card.is-completed {
+  border-color: rgba(140, 195, 179, 0.26);
+}
+
+.quest-card-head,
+.quest-foot,
+.quest-choice-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.quest-choice-actions {
+  justify-content: flex-start;
+}
+
+.quest-status {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.quest-status-offered {
+  color: var(--accent-strong);
+  background: rgba(214, 179, 116, 0.14);
+  border: 1px solid rgba(214, 179, 116, 0.24);
+}
+
+.quest-status-active {
+  color: #d7f2eb;
+  background: rgba(140, 195, 179, 0.14);
+  border: 1px solid rgba(140, 195, 179, 0.24);
+}
+
+.quest-status-completed {
+  color: #d7f2eb;
+  background: rgba(94, 159, 131, 0.14);
+  border: 1px solid rgba(94, 159, 131, 0.26);
+}
+
+.quest-status-declined {
+  color: var(--text-soft);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.quest-summary,
+.quest-objective {
+  margin: 0;
+}
+
+.quest-objective {
+  color: var(--text);
+}
+

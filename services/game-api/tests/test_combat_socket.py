@@ -5,7 +5,7 @@ import unittest
 from fastapi.testclient import TestClient
 
 from app.combat import create_combat_state
-from app.db import ensure_player_profile
+from app.db.runs import ensure_player_profile
 from app.game import create_run
 from app.main import app
 

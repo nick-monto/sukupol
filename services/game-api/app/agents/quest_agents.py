@@ -6,6 +6,8 @@ from typing import Any
 from .registry import register_agent_builder
 from .runtime import AgentInvocation
 
+from .sanitize import sanitize_prompt_input
+
 
 @dataclass(frozen=True)
 class QuestOfferContext:
@@ -38,15 +40,15 @@ def build_quest_offer_agent(context: QuestOfferContext, tools: tuple[Any, ...] =
             "Do not invent mechanics, extra rewards, or alternate objectives."
         ),
         user_prompt=(
-            f"NPC: {context.npc['display_name']}\n"
-            f"NPC role: {context.npc.get('role', 'contact')}\n"
-            f"NPC system prompt: {context.npc.get('system_prompt', '')}\n"
-            f"Player: {context.player_name}\n"
-            f"Player message: {context.player_message.strip()}\n"
-            f"Target item: {context.item_name}\n"
-            f"Target biome: {context.biome_name}\n"
+            f"NPC: {sanitize_prompt_input(context.npc['display_name'])}\n"
+            f"NPC role: {sanitize_prompt_input(context.npc.get('role', 'contact'))}\n"
+            f"NPC system prompt: {sanitize_prompt_input(context.npc.get('system_prompt', ''))}\n"
+            f"Player: {sanitize_prompt_input(context.player_name)}\n"
+            f"Player message: {sanitize_prompt_input(context.player_message)}\n"
+            f"Target item: {sanitize_prompt_input(context.item_name)}\n"
+            f"Target biome: {sanitize_prompt_input(context.biome_name)}\n"
             f"Reward gold: {context.reward_gold}\n"
-            f"Hint: {context.hint}\n"
+            f"Hint: {sanitize_prompt_input(context.hint)}\n"
             "Write one concise quest title, one summary sentence, one objective line, and one in-character offer line from the NPC."
         ),
         tools=tools,
@@ -62,12 +64,12 @@ def build_quest_response_agent(context: QuestResponseContext, tools: tuple[Any, 
             "Do not invent new quest facts beyond the provided item, biome, reward, and stance."
         ),
         user_prompt=(
-            f"NPC: {context.npc_name}\n"
+            f"NPC: {sanitize_prompt_input(context.npc_name)}\n"
             f"Stance: {context.stance}\n"
-            f"Item: {context.item_name}\n"
-            f"Biome: {context.biome_name}\n"
+            f"Item: {sanitize_prompt_input(context.item_name)}\n"
+            f"Biome: {sanitize_prompt_input(context.biome_name)}\n"
             f"Reward gold: {context.reward_gold}\n"
-            f"Hint: {context.hint}\n"
+            f"Hint: {sanitize_prompt_input(context.hint)}\n"
             "Write one short reply matching the stance."
         ),
         tools=tools,

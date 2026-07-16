@@ -325,7 +325,7 @@ def _generate_candidate(floor_seed: int, biome: dict, floor_number: int, setting
         if rooms:
             anchor_index = choose_anchor_room(len(rooms), settings, randomizer)
             connect_rooms(grid, rooms[anchor_index], candidate, randomizer)
-            connected_pairs.add(tuple(sorted((anchor_index, len(rooms)))))
+            connected_pairs.add((anchor_index, len(rooms)))
         rooms.append(candidate)
 
     if len(rooms) < 2:

@@ -6,6 +6,7 @@ import unittest
 from app.agents import AgentExecutor
 from app.agents.dialogue_agents import (
     NpcDialogueTurnContext,
+    sanitize_prompt_input,
     build_npc_dialogue_agent,
 )
 from app.agents.journal_agents import ExchangeSummaryContext, build_exchange_summary_agent
@@ -118,6 +119,7 @@ class DialogueAgentSeamTests(unittest.TestCase):
         self.assertEqual("Marta: Stay alert.", result.reply)
         self.assertEqual(1, len(fake_executor.calls))
         call = fake_executor.calls[0]
+        assert isinstance(call, dict)
         self.assertEqual("npc-marta-innkeeper", call["agent_name"])
         self.assertIn("Player message: What waits below?", str(call["user_prompt"]))
         self.assertEqual(3, len(call["tools"]))
@@ -143,6 +145,31 @@ class DialogueAgentSeamTests(unittest.TestCase):
             "Marta: The first halls listen harder than they look. Keep your torch high and your pace measured.",
             coerce_dialogue_reply_text(reply),
         )
+
+
+class PromptSanitizationTests(unittest.TestCase):
+    def test_sanitize_strips_newlines(self) -> None:
+        raw = "hello\nworld\r\ninjection"
+        result = sanitize_prompt_input(raw)
+        self.assertNotIn("\n", result)
+        self.assertNotIn("\r", result)
+        # Newlines converted to spaces and collapsed
+        self.assertEqual(result, "hello world injection")
+
+    def test_sanitize_strips_null_bytes(self) -> None:
+        raw = "normal\x00text"
+        result = sanitize_prompt_input(raw)
+        self.assertNotIn("\x00", result)
+
+    def test_sanitize_preserves_safe_content(self) -> None:
+        raw = "Hello there, what waits below?"
+        self.assertEqual(sanitize_prompt_input(raw), raw)
+
+    def test_sanitize_collapse_multiple_newlines(self) -> None:
+        raw = "a\n\n\nb"
+        result = sanitize_prompt_input(raw)
+        # Whitespace runs collapsed to single space
+        self.assertEqual(result, "a b")
 
 
 if __name__ == "__main__":

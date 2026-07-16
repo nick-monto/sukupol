@@ -1,0 +1,264 @@
+.panel-toggle {
+  padding: 0.55rem 0.85rem;
+}
+
+pre {
+  margin: 0;
+  overflow: auto;
+  min-height: 220px;
+  color: #f0ddba;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.9rem;
+}
+
+.compact-frame pre {
+  min-height: 180px;
+}
+
+.stat-card {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.stat-card strong {
+  color: var(--text);
+  font-size: 1.02rem;
+}
+
+.message-label,
+.inventory-mark {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.18rem 0.48rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid rgba(214, 179, 116, 0.2);
+  background: rgba(214, 179, 116, 0.08);
+}
+
+.controls,
+.combat-actions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.controls {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.controls button,
+.combat-actions button {
+  min-height: 3rem;
+}
+
+.viewport-controls {
+  margin-top: 0.25rem;
+}
+
+.npc-item,
+.inventory-item {
+  align-items: center;
+  padding: 0.9rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.npc-item {
+  align-items: stretch;
+}
+
+.npc-item-copy {
+  flex: 1;
+}
+
+.entity-ascii {
+  min-width: 8ch;
+  min-height: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(7, 12, 17, 0.72);
+  color: #ffd8c5;
+  font-size: 0.78rem;
+  line-height: 1.1;
+  overflow: hidden;
+}
+
+.npc-item.is-selected,
+.inventory-item.is-equipped {
+  border-top-color: rgba(214, 179, 116, 0.34);
+}
+
+.journal-list,
+.journal-group,
+.journal-group-entries,
+.journal-entry {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.journal-group {
+  padding: 0.85rem 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.journal-group-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.journal-entry {
+  padding: 0.8rem 0.9rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.journal-entry-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.journal-entry p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.action-panel {
+  background: transparent;
+}
+
+.dialogue-form label {
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+}
+
+.combat-actions {
+  display: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.combat-action-button.combat-action-attack {
+  background: linear-gradient(180deg, rgba(214, 179, 116, 0.16), rgba(214, 179, 116, 0.08));
+}
+
+.combat-action-button.combat-action-defend {
+  background: linear-gradient(180deg, rgba(152, 183, 174, 0.16), rgba(152, 183, 174, 0.06));
+  border-color: rgba(152, 183, 174, 0.24);
+}
+
+.combat-action-button.combat-action-item {
+  background: linear-gradient(180deg, rgba(102, 152, 214, 0.18), rgba(102, 152, 214, 0.08));
+  border-color: rgba(102, 152, 214, 0.26);
+}
+
+.combat-action-button.combat-action-flee {
+  background: linear-gradient(180deg, rgba(216, 138, 121, 0.18), rgba(216, 138, 121, 0.08));
+  border-color: rgba(216, 138, 121, 0.28);
+}
+
+.combat-action-button.combat-action-parley {
+  background: linear-gradient(180deg, rgba(168, 136, 214, 0.18), rgba(168, 136, 214, 0.08));
+  border-color: rgba(187, 162, 240, 0.3);
+}
+
+.action-panel[data-mode="combat"] .combat-actions,
+.action-panel[data-mode="combat-parley"] .combat-actions {
+  display: grid;
+}
+
+.action-panel[data-mode="combat"] .chat-composer-row,
+.action-panel[data-mode="archived"] .chat-composer-row {
+  display: none;
+}
+
+.action-panel[data-mode="combat"] label,
+.action-panel[data-mode="combat"] textarea,
+.action-panel[data-mode="combat"] #send-message,
+.action-panel[data-mode="archived"] label,
+.action-panel[data-mode="archived"] textarea,
+.action-panel[data-mode="archived"] #send-message {
+  display: none;
+}
+
+.action-panel[data-mode="combat-parley"] #leave-conversation {
+  display: none;
+}
+
+.action-panel[data-mode="combat-parley"] .combat-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.context-drawer {
+  position: absolute;
+  padding: 0;
+  opacity: 1;
+  transform: none;
+}
+
+.action-panel[data-mode="dialogue-ready"] {
+  border-color: rgba(152, 183, 174, 0.24);
+}
+
+.action-panel[data-mode="combat"],
+.action-panel[data-mode="combat-parley"],
+.log[data-mode="combat"] {
+  border-color: rgba(216, 138, 121, 0.28);
+}
+
+.action-panel[data-mode="archived"],
+.outcome-panel[data-mode="archived"] {
+  border-color: rgba(167, 176, 182, 0.24);
+  background: rgba(17, 21, 25, 0.94);
+}
+
+.log[data-mode="tuned"] {
+  border-color: rgba(152, 183, 174, 0.24);
+}
+
+.small {
+  font-size: 0.82rem;
+}
+
+.hotkey {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.45rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 6px;
+  color: var(--accent-strong);
+  background: rgba(214, 179, 116, 0.12);
+  border: 1px solid rgba(214, 179, 116, 0.18);
+}
+
+.empty-copy {
+  color: var(--text-soft);
+}
+
+.hero[data-transition="mode-change"],
+.panel[data-transition="mode-change"] {
+  animation: panel-mode-pulse 360ms ease;
+}
+
+.npc-item.is-selected {
+  animation: selected-contact-settle 220ms ease;
+}
+

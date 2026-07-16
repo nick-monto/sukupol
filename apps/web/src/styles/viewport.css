@@ -1,0 +1,280 @@
+.viewport-root {
+  --overlay-gap: 1rem;
+  --left-rail-width: clamp(20rem, 28vw, 32rem);
+  --right-rail-width: clamp(22rem, 31vw, 35rem);
+  --bottom-bar-width: min(58rem, calc(100vw - (var(--left-rail-width) + var(--right-rail-width) + (var(--overlay-gap) * 4))));
+  --combat-gap: 16px;
+  --combat-side-width: 312px;
+  --combat-bottom-height: 132px;
+  --combat-side-top-height: 356px;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #020304;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.viewport-root > * {
+  pointer-events: auto;
+}
+
+.viewport-overlay {
+  position: absolute;
+  z-index: 3;
+}
+
+.viewport-overlay[hidden] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+.hero h1,
+.panel h2,
+.panel h3 {
+  margin: 0;
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.hero h1 {
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  line-height: 1;
+}
+
+.hero p,
+.panel p,
+.panel span,
+.panel label {
+  color: var(--text-dim);
+}
+
+.hero-top,
+.panel-header,
+.npc-item,
+.inventory-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.hero-top,
+.panel-header {
+  align-items: start;
+}
+
+.hero-copy,
+.panel-header > div,
+.panel-header-compact > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.hero-lede,
+.signal,
+.message,
+.panel-note,
+.location-meta,
+.empty-copy {
+  margin: 0;
+}
+
+.hero-lede {
+  max-width: 44ch;
+  color: var(--text-soft);
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.hero-band {
+  display: grid;
+  grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  margin-top: 1rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid var(--line);
+}
+
+.signal {
+  color: var(--signal);
+  max-width: 30ch;
+}
+
+.shell[data-mode="combat"] .signal {
+  color: #f0b4a6;
+}
+
+.shell[data-mode="archived"] .signal {
+  color: #c3cad0;
+}
+
+.hero-summary,
+.inventory-list,
+.quest-list,
+.npc-list,
+.dialogue-form,
+.panel-subsection {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.hero-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.viewport-left-rail {
+  top: var(--overlay-gap);
+  left: var(--overlay-gap);
+  bottom: calc(12rem + var(--overlay-gap));
+  display: grid;
+  align-content: start;
+  gap: 0.9rem;
+  width: min(var(--left-rail-width), calc(100vw - (var(--overlay-gap) * 2)));
+  min-width: 0;
+}
+
+.viewport-side-dock {
+  display: grid;
+  align-content: start;
+  gap: 0.9rem;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.viewport-bottom-bar {
+  left: calc(var(--left-rail-width) + (var(--overlay-gap) * 2));
+  right: calc(var(--right-rail-width) + (var(--overlay-gap) * 2));
+  bottom: var(--overlay-gap);
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.grid-secondary {
+  grid-template-columns: minmax(0, 1.2fr) minmax(20rem, 0.95fr);
+}
+
+.panel-header {
+  margin-bottom: 0.9rem;
+}
+
+.panel-header-inline {
+  align-items: end;
+}
+
+.panel-header-compact {
+  margin-bottom: 0;
+}
+
+.panel-header-tools {
+  display: grid;
+  justify-items: end;
+  gap: 0.45rem;
+}
+
+.panel-note,
+.location-meta {
+  max-width: 28ch;
+  text-align: right;
+  color: var(--text-soft);
+}
+
+.display-frame {
+  padding: 0.65rem;
+  border-radius: 12px;
+  background: rgba(7, 10, 12, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.compact-frame {
+  padding: 0.7rem;
+}
+
+.viewport {
+  background: linear-gradient(180deg, rgba(14, 18, 22, 0.98) 0%, rgba(9, 12, 15, 0.98) 100%);
+}
+
+.viewport[data-mode="combat"] {
+  background: linear-gradient(180deg, rgba(26, 15, 17, 0.98) 0%, rgba(13, 8, 9, 0.98) 100%);
+}
+
+.viewport-frame {
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
+  padding: 0;
+  background: #050505;
+  border-radius: 0;
+  border: 0;
+}
+
+.viewport[data-mode="combat"] .viewport-frame {
+  min-height: 100%;
+}
+
+.viewport-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: clip;
+  background: #000;
+}
+
+.viewport[data-mode="combat"] .viewport-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, rgba(255, 142, 119, 0.06), transparent 38%),
+    linear-gradient(180deg, rgba(15, 4, 6, 0.18) 0%, rgba(20, 6, 7, 0.48) 100%);
+}
+
+.viewport-pixi-stage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  max-height: none;
+  background: #010101;
+  border: 0;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.viewport[data-mode="combat"] .viewport-pixi-stage {
+  min-height: 100%;
+}
+
+.viewport[data-mode="combat"] .viewport-pixi-stage canvas {
+  filter: none;
+  transform: none;
+  transform-origin: center;
+}

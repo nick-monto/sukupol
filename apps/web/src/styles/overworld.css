@@ -1,0 +1,85 @@
+.overworld-map,
+.overworld-map-card {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.overworld-map-card {
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(13, 18, 22, 0.94) 0%, rgba(10, 14, 17, 0.94) 100%);
+}
+
+.overworld-map-note {
+  margin: 0;
+  color: var(--text-soft);
+}
+
+.overworld-map-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.overworld-map-link {
+  stroke: rgba(125, 137, 136, 0.18);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 10 12;
+}
+
+.overworld-map-link.is-discovered {
+  stroke: rgba(214, 179, 116, 0.72);
+  stroke-dasharray: none;
+}
+
+.overworld-map-node {
+  opacity: 0.56;
+}
+
+.overworld-map-node.is-discovered {
+  opacity: 1;
+}
+
+.overworld-map-node-ring {
+  fill: rgba(255, 255, 255, 0.02);
+  stroke: rgba(125, 137, 136, 0.25);
+  stroke-width: 2;
+}
+
+.overworld-map-node-core {
+  fill: rgba(125, 137, 136, 0.34);
+  stroke: rgba(255, 255, 255, 0.05);
+  stroke-width: 1.5;
+}
+
+.overworld-map-node.is-discovered .overworld-map-node-ring {
+  stroke: rgba(214, 179, 116, 0.44);
+  fill: rgba(214, 179, 116, 0.08);
+}
+
+.overworld-map-node.is-discovered .overworld-map-node-core {
+  fill: rgba(214, 179, 116, 0.9);
+}
+
+.overworld-map-node.is-current .overworld-map-node-ring {
+  stroke: rgba(140, 195, 179, 0.82);
+  stroke-width: 3;
+  fill: rgba(140, 195, 179, 0.12);
+}
+
+.overworld-map-node.is-current .overworld-map-node-core {
+  fill: rgba(140, 195, 179, 0.96);
+}
+
+.overworld-map-node-label {
+  fill: var(--text-dim);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+.overworld-map-node:not(.is-discovered) .overworld-map-node-label {
+  fill: rgba(125, 137, 136, 0.72);
+  font-style: italic;
+}

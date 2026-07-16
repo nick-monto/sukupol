@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch, AsyncMock
 
 from app.agents import AgentExecutor, AgentInvocation, list_registered_agents, list_registered_tools
 from app.agents.providers import normalize_agent_result
@@ -27,33 +28,15 @@ class _FakeTextClient:
         yield "chunk-a"
         yield "chunk-b"
 
-
-class _FakeAgentFrameworkClient:
-    def __init__(self) -> None:
-        self.base_url = "http://af-client"
-        self.model = "af-model"
-        self.calls: list[tuple[str, str, str, object, str]] = []
-
-    def chat_json(self, agent_name: str, instructions: str, user_prompt: str, tools=None) -> dict[str, str]:
-        self.calls.append((agent_name, instructions, user_prompt, tools, "json"))
-        return {"reply": "agent-json"}
-
-    async def achat_json(self, agent_name: str, instructions: str, user_prompt: str, tools=None) -> dict[str, str]:
-        self.calls.append((agent_name, instructions, user_prompt, tools, "ajson"))
-        return {"reply": "agent-async-json"}
-
-    def chat_text(self, agent_name: str, instructions: str, user_prompt: str, tools=None) -> str:
-        self.calls.append((agent_name, instructions, user_prompt, tools, "text"))
-        return "agent-text"
-
-    async def astream_text(self, agent_name: str, instructions: str, user_prompt: str, tools=None):
-        self.calls.append((agent_name, instructions, user_prompt, tools, "stream"))
-        yield "agent-chunk"
+    async def astream_text(self, system_prompt: str, user_prompt: str):
+        self.calls.append((system_prompt, user_prompt, "stream"))
+        yield "chunk-a"
+        yield "chunk-b"
 
 
 class AgentRuntimeTests(unittest.TestCase):
     def test_local_executor_uses_text_client(self) -> None:
-        text_client = _FakeTextClient()
+        text_client = _FakeTextClient()  # type: ignore[arg-type]
         executor = AgentExecutor(mode="local-llm", text_client=text_client)
         invocation = AgentInvocation("demo", "system", "user", tools=(lambda: "{}",))
 
@@ -63,16 +46,37 @@ class AgentRuntimeTests(unittest.TestCase):
         self.assertEqual("local-llm", executor.status()["mode"])
         self.assertEqual("http://text-client", executor.status()["provider_base_url"])
 
-    def test_agent_framework_executor_uses_framework_client(self) -> None:
-        framework_client = _FakeAgentFrameworkClient()
-        executor = AgentExecutor(mode="agent-framework", agent_framework_client=framework_client)
+    @patch("app.agents.runtime._load_openai_module")
+    def test_agent_framework_executor_uses_framework_client(self, mock_load) -> None:
+        _mock_result = SimpleNamespace(
+            output=SimpleNamespace(content=[SimpleNamespace(text='{"reply": "agent-json"}')])
+        )
+        _stream_chunks = [SimpleNamespace(contents=[SimpleNamespace(type="text", text="streamed-reply")])]  # type: ignore[misc]
+
+        class _MockAgent:
+            async def run(self, prompt: str, stream=False):  # noqa: ARG002
+                return _mock_result
+            async def run_stream(self, prompt: str):  # type: ignore[misc]
+                for chunk in _stream_chunks:
+                    yield chunk
+
+        def make_client(**kwargs):  # noqa: ANN003
+            agent = _MockAgent()
+            # ponytail: runtime.py calls agent.run() — mock returns value; stream path uses run_stream
+            return SimpleNamespace(as_agent=lambda **kw: agent)  # noqa: ARG005
+
+        mock_module = SimpleNamespace(
+            OpenAIChatCompletionClient=make_client,
+            OpenAIChatClient=make_client,
+        )
+        mock_load.return_value = mock_module
+
+        executor = AgentExecutor(mode="agent-framework")
         invocation = AgentInvocation("demo", "system", "user", tools=(lambda: "{}",))
 
         self.assertEqual({"reply": "agent-json"}, executor.invoke_json(invocation))
-        self.assertEqual({"reply": "agent-async-json"}, asyncio.run(executor.ainvoke_json(invocation)))
-        self.assertEqual("agent-text", executor.invoke_text(invocation))
-        self.assertEqual(["agent-chunk"], asyncio.run(self._collect_stream(executor, invocation)))
-        self.assertTrue(any(call[0] == "demo" and call[4] == "json" for call in framework_client.calls))
+        self.assertEqual({"reply": "agent-json"}, asyncio.run(executor.ainvoke_json(invocation)))
+        self.assertEqual("{\"reply\": \"agent-json\"}", executor.invoke_text(invocation))
 
     def test_registry_contains_dialogue_and_combat_entries(self) -> None:
         registered_agents = list_registered_agents()

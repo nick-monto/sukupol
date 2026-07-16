@@ -1,0 +1,23 @@
+"""Database persistence layer.
+
+External importers should import from the specific submodule:
+  from app.db.connection import ...
+  from app.db.dungeons import ...
+  from app.db.journal import ...
+  from app.db.npcs import ...
+  from app.db.quests import ...
+  from app.db.runs import ...
+  from app.db.seed import ...
+
+Sub-modules:
+- connection: connect, resolve_db_path, utc_now, initialize_database
+- seed: seed_npc_content, seed_npc_knowledge, seed_gameplay_content
+- runs: ensure_player_profile, save_run_snapshot, load_run_snapshot, save_run_outcome, upsert_player_progression
+- dungeons: get_dungeon_instance_for_run, create_dungeon_instance, persist_dungeon_floor, load_dungeon_floor, load_dungeon_floor_for_instance
+- npcs: load_conversation_summary, load_npc_player_memory, upsert_npc_player_memory, list_npc_shared_knowledge, upsert_npc_shared_knowledge, upsert_conversation_summary
+- journal: create_npc_journal_entry, list_player_npc_journal
+- quests: create_player_quest, list_player_quests, load_player_quest, set_player_quest_status, set_player_quest_progress
+"""
+
+# All public API names are available via their submodules (above).
+# No re-exports are needed since all callers import from submodules directly.

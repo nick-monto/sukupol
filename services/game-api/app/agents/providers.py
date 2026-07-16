@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+# ponytail: TODO — uses synchronous urllib.request.urlopen() blocking event loop during LLM inference.
+# Future migration target: aiohttp/httpx.AsyncClient
 import asyncio
 import importlib
 import json
 import os
 from typing import Any, AsyncIterator, Iterator
 from urllib import error, request
+from .config import resolve_base_url
 
 
 class OpenAICompatibleAgentClient:
@@ -13,11 +16,19 @@ class OpenAICompatibleAgentClient:
         self.base_url = os.getenv("SUKUPOL_OPENAI_BASE_URL", "http://127.0.0.1:8033")
         self.model = os.getenv("SUKUPOL_OPENAI_MODEL", "agent-framework")
         self.api_key = os.getenv("SUKUPOL_OPENAI_API_KEY", "")
-        self.timeout = float(os.getenv("SUKUPOL_OPENAI_TIMEOUT", "20"))
-        self.temperature = float(os.getenv("SUKUPOL_OPENAI_TEMPERATURE", "1.0"))
+        try:
+            self.timeout = float(os.getenv("SUKUPOL_OPENAI_TIMEOUT", "20"))
+        except ValueError:
+            self.timeout = 20.0
+        try:
+            self.temperature = float(os.getenv("SUKUPOL_OPENAI_TEMPERATURE", "1.0"))
+        except ValueError:
+            self.temperature = 1.0
 
     def chat_json(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
         return extract_json_payload(self.chat_text(system_prompt, user_prompt))
+    async def achat_json(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+        return extract_json_payload(await self.achat_text(system_prompt, user_prompt))
 
     def chat_text(self, system_prompt: str, user_prompt: str) -> str:
         payload = {
@@ -29,6 +40,16 @@ class OpenAICompatibleAgentClient:
             ],
         }
         return self._post(payload)
+    async def achat_text(self, system_prompt: str, user_prompt: str) -> str:
+        payload = {
+            "model": self.model,
+            "temperature": self.temperature,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        }
+        return await self._apost(payload)
 
     def stream_text(self, system_prompt: str, user_prompt: str) -> Iterator[str]:
         payload = {
@@ -41,6 +62,18 @@ class OpenAICompatibleAgentClient:
             ],
         }
         yield from self._post_stream(payload)
+    async def astream_text(self, system_prompt: str, user_prompt: str) -> AsyncIterator[str]:
+        payload = {
+            "model": self.model,
+            "temperature": self.temperature,
+            "stream": True,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        }
+        async for chunk in self._apost_stream(payload):
+            yield chunk
 
     def _post(self, payload: dict[str, Any]) -> str:
         endpoint = resolve_chat_endpoint(self.base_url)
@@ -60,6 +93,8 @@ class OpenAICompatibleAgentClient:
             return body["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise RuntimeError("Dialogue provider response did not contain a chat completion message") from exc
+    async def _apost(self, payload: dict[str, Any]) -> str:
+        return await asyncio.to_thread(self._post, payload)
 
     def _post_stream(self, payload: dict[str, Any]) -> Iterator[str]:
         endpoint = resolve_chat_endpoint(self.base_url)
@@ -80,7 +115,8 @@ class OpenAICompatibleAgentClient:
                         return
                     try:
                         payload = json.loads(data_str)
-                    except json.JSONDecodeError:
+                    except (json.JSONDecodeError, ValueError):
+                        # Skip malformed SSE data frames
                         continue
                     choices = payload.get("choices", [])
                     if not choices:
@@ -92,132 +128,26 @@ class OpenAICompatibleAgentClient:
         except (error.URLError, error.HTTPError, TimeoutError) as exc:
             raise RuntimeError(f"Dialogue provider stream failed: {exc}") from exc
 
+    async def _apost_stream(self, payload: dict[str, Any]) -> AsyncIterator[str]:
+        """Async generator that drains sync _post_stream via per-chunk asyncio.to_thread."""
+        iterator = iter(self._post_stream(payload))
+        _sentinel = object()
 
-class AgentFrameworkClient:
-    def __init__(self) -> None:
-        self.base_url = resolve_agent_framework_base_url(
-            os.getenv("SUKUPOL_AGENT_FRAMEWORK_BASE_URL")
-            or os.getenv("SUKUPOL_OPENAI_BASE_URL")
-            or os.getenv("OLLAMA_ENDPOINT")
-            or "http://127.0.0.1:8033/v1/"
-        )
-        self.model = (
-            os.getenv("SUKUPOL_AGENT_FRAMEWORK_MODEL")
-            or os.getenv("SUKUPOL_OPENAI_MODEL")
-            or os.getenv("OLLAMA_MODEL")
-            or "local-model"
-        )
-        self.api_key = (
-            os.getenv("SUKUPOL_AGENT_FRAMEWORK_API_KEY")
-            or os.getenv("SUKUPOL_OPENAI_API_KEY")
-            or os.getenv("OLLAMA_API_KEY")
-            or "ollama"
-        )
+        def _next() -> str | object:
+            try:
+                return next(iterator)
+            except StopIteration:
+                return _sentinel
 
-    def chat_json(
-        self,
-        agent_name: str,
-        instructions: str,
-        user_prompt: str,
-        tools: Any = None,
-    ) -> dict[str, Any]:
-        return extract_json_payload(self.chat_text(agent_name, instructions, user_prompt, tools=tools))
-
-    def chat_text(
-        self,
-        agent_name: str,
-        instructions: str,
-        user_prompt: str,
-        tools: Any = None,
-    ) -> str:
-        return asyncio.run(self.achat_text(agent_name, instructions, user_prompt, tools=tools))
-
-    async def achat_json(
-        self,
-        agent_name: str,
-        instructions: str,
-        user_prompt: str,
-        tools: Any = None,
-    ) -> dict[str, Any]:
-        return extract_json_payload(await self.achat_text(agent_name, instructions, user_prompt, tools=tools))
-
-    async def achat_text(
-        self,
-        agent_name: str,
-        instructions: str,
-        user_prompt: str,
-        tools: Any = None,
-    ) -> str:
-        openai_module = self._load_openai_module()
-        try:
-            client_class = openai_module.OpenAIChatCompletionClient if tools else openai_module.OpenAIChatClient
-            client = client_class(
-                api_key=self.api_key,
-                base_url=self.base_url,
-                model=self.model,
-            )
-            agent = client.as_agent(
-                name=agent_name,
-                instructions=instructions,
-                tools=tools,
-            )
-            result = await agent.run(user_prompt)
-        except Exception as exc:
-            raise RuntimeError(f"Agent Framework request failed: {exc}") from exc
-        return normalize_agent_result(result)
-
-    async def astream_text(
-        self,
-        agent_name: str,
-        instructions: str,
-        user_prompt: str,
-        tools: Any = None,
-    ) -> AsyncIterator[str]:
-        openai_module = self._load_openai_module()
-        try:
-            client_class = openai_module.OpenAIChatCompletionClient if tools else openai_module.OpenAIChatClient
-            client = client_class(
-                api_key=self.api_key,
-                base_url=self.base_url,
-                model=self.model,
-            )
-            agent = client.as_agent(
-                name=agent_name,
-                instructions=instructions,
-                tools=tools,
-            )
-            async for chunk in agent.run(user_prompt, stream=True):
-                for text in iter_stream_text_parts(chunk):
-                    yield text
-        except Exception as exc:
-            raise RuntimeError(f"Agent Framework stream failed: {exc}") from exc
-
-    def _load_openai_module(self) -> Any:
-        try:
-            return importlib.import_module("agent_framework.openai")
-        except ModuleNotFoundError as exc:
-            raise RuntimeError(
-                "Microsoft Agent Framework is not installed in this environment. Install the 'agent-framework' package "
-                "or switch SUKUPOL_DIALOGUE_MODE to 'local-llm' or 'stub'."
-            ) from exc
+        while True:
+            chunk = await asyncio.to_thread(_next)
+            if chunk is _sentinel:
+                return
+            yield chunk  # type: ignore[misc]
 
 
 def resolve_chat_endpoint(base_url: str) -> str:
-    normalized = base_url.rstrip("/")
-    if normalized.endswith("/chat/completions"):
-        return normalized
-    if normalized.endswith("/v1"):
-        return f"{normalized}/chat/completions"
-    return f"{normalized}/v1/chat/completions"
-
-
-def resolve_agent_framework_base_url(base_url: str) -> str:
-    normalized = base_url.rstrip("/")
-    if normalized.endswith("/v1"):
-        return f"{normalized}/"
-    if normalized.endswith("/chat/completions"):
-        return f"{normalized[: -len('/chat/completions')]}/"
-    return f"{normalized}/v1/"
+    return resolve_base_url(base_url, for_framework=False)
 
 
 def extract_json_payload(content: str) -> dict[str, Any]:

@@ -1,6 +1,6 @@
-import "./styles.css";
+import "./styles/index.css";
 
-import { bindInteractionHandlers, bindNpcSelection, leaveNpcConversation, syncBusyState } from "./controller";
+import { bindInteractionHandlers, bindNpcSelection, createPinballRegistry, leaveNpcConversation, syncBusyState } from "./controller";
 import { renderApp } from "./render";
 import type { AppState } from "./types";
 import { createAppMarkup, getUiElements } from "./ui";
@@ -35,12 +35,15 @@ app.innerHTML = createAppMarkup(state.bootstrapTitle);
 
 const ui = getUiElements();
 
+const pinballRegistry = createPinballRegistry();
+
 const { managePinball } = bindInteractionHandlers({
   apiBase,
   state,
   ui,
   render,
   renderError,
+  pinballRegistry,
 });
 
 render();
@@ -65,6 +68,7 @@ function render(): void {
         ui,
         render,
         renderError,
+        pinballRegistry,
       }, state.selectedNpcId);
     }
 

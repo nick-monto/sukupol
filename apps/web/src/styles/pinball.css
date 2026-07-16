@@ -1,0 +1,262 @@
+/* ── Pinball cabinet (left column) ── */
+.combat-pinball-cabinet {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.combat-pinball-cabinet canvas {
+  display: block;
+  height: 100%;
+  max-height: min(100%, 800px);
+  width: auto;
+  max-width: 100%;
+  image-rendering: pixelated;
+  border-radius: 6px;
+}
+
+.combat-cabinet-sidecard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.9rem;
+  min-height: 0;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 236, 214, 0.1);
+  background:
+    radial-gradient(circle at top, rgba(214, 179, 116, 0.08), transparent 48%),
+    linear-gradient(180deg, rgba(15, 17, 21, 0.95) 0%, rgba(8, 10, 12, 0.98) 100%),
+    rgba(0, 0, 0, 0.8);
+  box-shadow:
+    0 24px 56px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.combat-cabinet-sidecard-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.combat-cabinet-sidecard-head h3 {
+  margin: 0.2rem 0 0;
+  font-family: "Fraunces", serif;
+  font-size: clamp(1.15rem, 1.9vw, 1.55rem);
+}
+
+.combat-cabinet-monster-panel {
+  display: grid;
+  min-height: 7.25rem;
+  padding: 0.35rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top, rgba(255, 196, 152, 0.06), transparent 58%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.combat-cabinet-monster-panel .combat-overlay-art,
+.combat-cabinet-monster-panel .combat-overlay-sigil {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.combat-cabinet-hp-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.combat-cabinet-hp-card {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.72rem 0.75rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.combat-cabinet-hp-card strong {
+  font-family: "Fraunces", serif;
+  font-size: 1.1rem;
+}
+
+.combat-hp-sep {
+  opacity: 0.45;
+  margin: 0 0.15em;
+}
+
+.combat-hp-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.combat-hp-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 300ms ease;
+}
+
+.combat-hp-bar-fill.is-enemy {
+  background: rgba(236, 100, 80, 0.75);
+}
+
+.combat-hp-bar-fill.is-player {
+  background: rgba(214, 179, 116, 0.8);
+}
+
+.combat-cabinet-hp-card.is-enemy {
+  border-color: rgba(236, 153, 136, 0.22);
+}
+
+.combat-cabinet-hp-card.is-player {
+  border-color: rgba(255, 214, 157, 0.22);
+}
+
+
+/* ── Pinball sidecard head ── */
+.combat-cabinet-sidecard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.combat-cabinet-sidecard-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+/* ── Monster panel (art / sigil) ── */
+.combat-cabinet-monster-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.28);
+  padding: 0.5rem;
+  min-height: 4rem;
+  max-height: 9rem;
+  overflow: hidden;
+}
+
+.combat-cabinet-monster-panel .combat-overlay-art {
+  font-size: 0.62rem;
+  margin: 0;
+  line-height: 1.25;
+  color: rgba(255, 236, 214, 0.85);
+}
+
+.combat-cabinet-monster-panel .combat-overlay-sigil {
+  font-size: 2.5rem;
+  font-family: "Fraunces", serif;
+  color: rgba(214, 179, 116, 0.7);
+}
+
+/* ── HP grid ── */
+.combat-cabinet-hp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+/* ── Inventory strip (bottom) ── */
+.combat-inventory-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  overflow-x: auto;
+  flex-shrink: 0;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(6px);
+  scrollbar-width: none;
+}
+
+.combat-inventory-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.combat-inventory-empty {
+  opacity: 0.5;
+  white-space: nowrap;
+  margin: 0;
+}
+
+.combat-inventory-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.05);
+  white-space: nowrap;
+  cursor: default;
+  flex-shrink: 0;
+  transition: border-color 160ms, background 160ms;
+}
+
+.combat-inventory-item.is-equipped {
+  border-color: rgba(214, 179, 116, 0.5);
+  background: rgba(214, 179, 116, 0.1);
+  box-shadow: 0 0 10px rgba(214, 179, 116, 0.12);
+}
+
+.combat-inventory-item-name {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--viewport-combat-text);
+}
+
+.combat-inventory-item-type {
+  font-size: 0.62rem;
+  opacity: 0.55;
+  text-transform: capitalize;
+}
+
+.combat-inventory-item-badge {
+  font-size: 0.58rem;
+  padding: 0.1em 0.45em;
+  border-radius: 999px;
+  background: rgba(214, 179, 116, 0.22);
+  color: rgba(255, 228, 180, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.support-stack {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: 1fr;
+}
+
+.stage-contacts-panel {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.stage-contacts-panel > div:first-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
